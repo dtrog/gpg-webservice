@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  gpg-webservice:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - DATABASE=/app/gpg_users.db
+    volumes:
+      - ./gpg_users.db:/app/gpg_users.db
+      - /tmp/gpg-docker:/tmp/gnupg
+    networks:
+      - gpg-network
+
+  test-runner:
+    build: .
+    command: python -m pytest tests/test_app.py -v
+    environment:
+      - GNUPGHOME=/tmp/gnupg
+      - GPG_AGENT_INFO=""
+      - GPG_TTY=""
+      - DATABASE=/app/test.db
+    volumes:
+      - /tmp/gpg-test:/tmp/gnupg
+    networks:
+      - gpg-network
+    profiles:
+      - test
+
+networks:
+  gpg-network:
+    driver: bridge

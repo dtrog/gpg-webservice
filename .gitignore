@@ -1,0 +1,65 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Test/coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database and runtime
+instance/
+gpg_users.db
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Docker
+*.sock
+
+# Misc
+*.bak
+*.orig
+*.tmp
+*.old
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+
+# Build
+build/
+dist/
+.eggs/
+*.manifest
+*.spec
+
+# Node (if any frontend)
+node_modules/
+
+# Ignore test artifacts
+tests/fixtures/*.asc
