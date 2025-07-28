@@ -207,17 +207,19 @@ def test_register_and_login_user(monkeypatch):
                 
                 # Test user registration with unique username
                 import uuid
+                from typing import cast  # added import
+                from models.user import User  # ensure User is imported
                 unique_user = f"testuser_{str(uuid.uuid4())[:8]}"
                 user, result = us.register_user(unique_user, 'testpass', 'PUBLIC_KEY_DATA', 'PRIVATE_KEY_DATA')
                 assert user is not None, f"Registration should succeed, got error: {result}"
-                assert user.username == unique_user
+                assert cast(User, user).username == unique_user
                 assert hasattr(user, 'api_key')
-                assert user.api_key is not None
+                assert cast(User, user).api_key is not None
                 
                 # Test successful login
                 user2, keypair2 = us.login_user(unique_user, 'testpass')
                 assert user2 is not None, "Login should succeed"
-                assert user2.username == unique_user
+                assert cast(User, user2).username == unique_user
                 
                 # Test failed login with wrong password
                 user3, err = us.login_user(unique_user, 'wrongpass')
@@ -227,4 +229,5 @@ def test_register_and_login_user(monkeypatch):
                 # Test duplicate registration
                 user4, err = us.register_user(unique_user, 'testpass', 'PUB', 'PRIV')
                 assert user4 is None
-                assert err == 'Username already exists'
+                assert err == 'Username already exists' 
+            

@@ -39,7 +39,7 @@ class ChallengeService:
         session = get_session()
         self.prune_old_challenges(session, user_id)
         challenge_data = secrets.token_urlsafe(32)
-        challenge = Challenge(user_id=user_id, challenge_data=challenge_data)
+        challenge = Challenge(user_id=user_id, challenge_data=challenge_data, signature=None)
         session.add(challenge)
         session.commit()
         session.refresh(challenge)

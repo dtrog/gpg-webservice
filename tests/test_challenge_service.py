@@ -4,15 +4,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import pytest
 from flask import Flask
+from unittest.mock import patch, MagicMock
 from services.challenge_service import ChallengeService
 from models.challenge import Challenge
+from models.user import User
+from models.pgp_key import PgpKey
 from db.database import init_db
-from unittest.mock import patch, MagicMock
-import sys
-import importlib
 
 @pytest.fixture(scope="module")
 def app():
+    """Create a Flask app for testing."""
     app = Flask(__name__)
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
@@ -22,149 +23,132 @@ def app():
         yield app
 
 @pytest.fixture(autouse=True)
-def app_context(app):
+def app_context(app: Flask):
+    """Ensure all tests run within Flask app context."""
     with app.app_context():
         yield
 
-def test_create_challenge(monkeypatch):
-    class MockSession:
-        def __init__(self):
-            self.challenges = []
-
-        def add(self, obj):
-            self.challenges.append(obj)
-
-        def commit(self):
-            pass
-
-        def query(self, model):
-            class MockQuery:
-                def __init__(self, challenges):
-                    self.challenges = challenges
-                    
-                def filter_by(self, **kwargs):
-                    for challenge in self.challenges:
-                        if challenge.user_id == kwargs.get("user_id"):
-                            return MockResult(challenge)
-                    return MockResult(None)
-
-            return MockQuery(self.challenges)
-
-    class MockResult:
-        def __init__(self, result):
-            self.result = result
-
-        def first(self):
-            return self.result
-
-    monkeypatch.setattr("db.database.get_session", lambda: MockSession())
-
-    service = ChallengeService()
-    challenge = service.create_challenge(user_id=1)
-    assert challenge.user_id == 1
-    assert challenge.challenge_data is not None
-
-def test_verify_challenge(monkeypatch):
-    class MockSession:
-        def __init__(self):
-            self.challenges = []
-
-        def query(self, model):
-            class MockQuery:
-                def __init__(self, challenges):
-                    self.challenges = challenges
-                    
-                def filter_by(self, **kwargs):
-                    for challenge in self.challenges:
-                        if challenge.user_id == kwargs.get("user_id") and challenge.challenge_data == kwargs.get("challenge_data"):
-                            return MockResult(challenge)
-                    return MockResult(None)
-                
-            return MockQuery(self.challenges)
+def test_create_challenge():
+    """Test challenge creation with proper mocking."""
+    with patch('services.challenge_service.get_session') as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
         
-        def add(self, obj):
-            self.challenges.append(obj)
-
-
-        def delete(self, obj):
-            self.challenges.remove(obj)
-
-        def commit(self):
-            pass
-
-        def close(self):
-            pass
+        # Mock the query for pruning old challenges
+        mock_query = MagicMock()
+        mock_query.filter.return_value.filter.return_value.delete.return_value = None
+        mock_query.filter.return_value.order_by.return_value.__getitem__.return_value = []
+        mock_session.query.return_value = mock_query
         
-
-    class MockResult:
-        def __init__(self, result):
-            self.result = result
-
-        def first(self):
-            return self.result
-        def all(self):
-            return self.result
+        with patch('secrets.token_urlsafe', return_value="test_challenge_data"):
+            service = ChallengeService()
+            result = service.create_challenge(user_id=1)
             
+            # Verify the challenge was created correctly
+            assert result.user_id == 1
+            assert result.challenge_data == "test_challenge_data"
+            
+            # Verify database interactions
+            mock_session.add.assert_called_once()
+            mock_session.commit.assert_called()
+            mock_session.refresh.assert_called_once()
+            mock_session.close.assert_called()
 
-    monkeypatch.setattr("db.database.get_session", lambda: MockSession())
-    monkeypatch.setattr("utils.gpg_utils.verify_signature", lambda d, s, k: True)
+def test_verify_challenge():
+    """Test challenge verification with proper mocking."""
+    from datetime import datetime, timezone
+    
+    # Mock challenge and set its user
+    mock_challenge = MagicMock()
+    mock_challenge.user_id = 1
+    mock_challenge.challenge_data = "test_data"
+    mock_challenge.created_at = datetime.now(timezone.utc)
+    
+    # Mock user with PGP key
+    mock_pgp_key = MagicMock(key_type='public', key_data='mock_public_key')
+    mock_user = MagicMock()
+    mock_user.pgp_keys.all.return_value = [mock_pgp_key]
+    mock_challenge.user = mock_user
 
-    service = ChallengeService()
-    result, message = service.verify_challenge(user_id=1, challenge_data="data", signature="signature")
-    assert result
-    assert message == "Challenge verified"
+    with patch('services.challenge_service.get_session', return_value=MagicMock()) as mock_get_session:
+        mock_session = mock_get_session.return_value
+        # Mock challenge query
+        mock_challenge_query = MagicMock()
+        mock_challenge_query.filter_by.return_value.first.return_value = mock_challenge
+        # Mock user query
+        mock_user_query = MagicMock()
+        mock_user_query.filter_by.return_value.first.return_value = mock_user
+        # Setup query side effect
+        def query_side_effect(model):
+            if model == Challenge:
+                return mock_challenge_query
+            elif model == User:
+                return mock_user_query
+            return MagicMock()
+        mock_session.query.side_effect = query_side_effect
+        # Mock signature verification
+        with patch('utils.gpg_utils.verify_signature', return_value=True):
+            service = ChallengeService()
+            result, message = service.verify_challenge(
+                user_id=1,
+                challenge_data="test_data",
+                signature="test_signature"
+            )
+            assert result is True
+            assert message == "Challenge verified"
+            mock_session.delete.assert_called_once_with(mock_challenge)
+            mock_session.commit.assert_called_once()
+            mock_session.close.assert_called_once()
 
-def test_create_and_verify_challenge(monkeypatch):
-    # Patch DB session and GPG verify
-    class DummySession:
-        def __init__(self):
-            self.challenges = []
-            self.users = {1: DummyUser()}
-            self.committed = False
-        def query(self, model):
-            parent = self
-            class Q:
-                def __init__(self):
-                    self.parent = parent
-                def filter_by(self, **kwargs):
-                    if model is Challenge:
-                        for c in self.parent.challenges:
-                            if c.user_id == kwargs.get('user_id') and c.challenge_data == kwargs.get('challenge_data'):
-                                return DummyResult(c)
-                        return DummyResult(None)
-                def filter(self, *args):
-                    return DummyResult(None)
-                def order_by(self, *args):
-                    return self.parent.challenges
-            return Q()
-        def add(self, obj):
-            self.challenges.append(obj)
-        def commit(self):
-            self.committed = True
-        def close(self):
-            pass
-        def refresh(self, obj):
-            pass
-        def delete(self, obj):
-            self.challenges.remove(obj)
-    class DummyUser:
-        pgp_keys = [MagicMock(key_type='public', key_data='PUBKEY')]
-    class DummyResult:
-        def __init__(self, val):
-            self.val = val
-        def first(self):
-            return self.val
-        def all(self):
-            return self.val
-    monkeypatch.setattr('db.database.get_session', lambda: DummySession())
-    monkeypatch.setattr('utils.gpg_utils.verify_signature', lambda d, s, k: True)
-    sys.path.insert(0, '.')
-    app_mod = importlib.import_module('app')
-    app = app_mod.app
-    with app.app_context():
-        cs = ChallengeService()
-        challenge = cs.create_challenge(1)
-        assert challenge.user_id == 1
-        ok, msg = cs.verify_challenge(1, challenge.challenge_data, 'sig')
-        assert ok
-        assert msg == 'Challenge verified'
+def test_create_and_verify_challenge():
+    """Test full challenge creation and verification flow."""
+    from datetime import datetime, timezone
+    # Prepare mock challenge and user
+    mock_challenge = MagicMock(user_id=1, challenge_data="test_challenge_data")
+    mock_challenge.created_at = datetime.now(timezone.utc)
+    mock_pgp_key = MagicMock(key_type='public', key_data='mock_public_key')
+    mock_user = MagicMock()
+    mock_user.pgp_keys.all.return_value = [mock_pgp_key]
+    mock_challenge.user = mock_user
+
+    cs = ChallengeService()
+    # Mock creation
+    with patch('services.challenge_service.get_session') as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+        # Prune returns nothing
+        mock_query = MagicMock()
+        mock_query.filter.return_value.filter.return_value.delete.return_value = None
+        mock_query.filter.return_value.order_by.return_value.all.return_value = []
+        mock_session.query.return_value = mock_query
+        with patch('secrets.token_urlsafe', return_value="test_challenge_data"):
+            # Create challenge
+            challenge = cs.create_challenge(user_id=1)
+            assert challenge.user_id == 1
+            assert challenge.challenge_data == "test_challenge_data"
+
+    # Mock verification
+    with patch('services.challenge_service.get_session') as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+        # Query returns our mock challenge and user
+        mock_challenge_query = MagicMock()
+        mock_challenge_query.filter_by.return_value.first.return_value = mock_challenge
+        mock_user_query = MagicMock()
+        mock_user_query.filter_by.return_value.first.return_value = mock_user
+        def query_side_effect(model):
+            if model == Challenge:
+                return mock_challenge_query
+            elif model == User:
+                return mock_user_query
+            return MagicMock()
+        mock_session.query.side_effect = query_side_effect
+        # Verify signature
+        with patch('utils.gpg_utils.verify_signature', return_value=True):
+            result, message = cs.verify_challenge(
+                user_id=1,
+                challenge_data="test_challenge_data",
+                signature="test_signature"
+            )
+            assert result is True
+            assert message == "Challenge verified"

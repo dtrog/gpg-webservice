@@ -45,8 +45,8 @@ def test_gpg_service_encrypt_decrypt(monkeypatch):
             def __init__(self, args):
                 self.returncode = 0
                 if '--list-keys' in args:
-                    # Simulate a valid key id line for GPGService
-                    self.stdout = b'fpr:::::::::dummykeyid::::::\n'
+                    # Simulate a valid pub: line for GPGService (format: pub:trust:length:algo:keyid:...)
+                    self.stdout = b'pub:u:2048:1:DUMMYKEYID123456:2021-01-01:::u:::scESC:::\n'
                 else:
                     self.stdout = b''
                 self.stderr = b''
