@@ -1,5 +1,7 @@
 import os
 import sys
+
+from utils.crypto_utils import generate_api_key
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import pytest
@@ -129,7 +131,10 @@ def test_login_user(monkeypatch):
             return self.result
 
     monkeypatch.setattr("db.database.get_session", lambda: MockSession())
-    monkeypatch.setattr("services.auth_service.verify_password", lambda p, h: p == "password" and h == "hashedpassword")
+    def mock_verify_password(password, password_hash):
+        return password == "password" and password_hash == "hashedpassword"
+
+    monkeypatch.setattr("services.auth_service.verify_password", mock_verify_password)
 
     service = UserService()
     user, _ = service.login_user(username="testuser", password="password")
@@ -142,76 +147,84 @@ def test_login_user(monkeypatch):
     assert error == "Invalid credentials"
 
 def test_register_and_login_user(monkeypatch):
-    # Mock User class to ensure it has password_hash attribute
-    class MockUser:
-        def __init__(self, username, password_hash=None, api_key=None):
-            self.id = None
-            self.username = username
-            self.password_hash = password_hash
-            self.api_key = api_key
-    
-    monkeypatch.setattr('models.user.User', MockUser)
-    
-    # Mock DB session
-    class DummySession:
-        def __init__(self):
-            self.users = {}
-            self.pgp_keys = []
-            self.committed = False
-        def query(self, model):
-            parent = self
-            class Q:
-                def __init__(self):
-                    self.parent = parent
-                def filter_by(self, **kwargs):
-                    if model is MockUser:
-                        username = kwargs.get('username')
-                        return DummyResult(self.parent.users.get(username))
-                    if model is PgpKey:
-                        user_id = kwargs.get('user_id')
-                        key_type = kwargs.get('key_type')
-                        for k in self.parent.pgp_keys:
-                            if k.user_id == user_id and k.key_type == key_type:
-                                return DummyResult(k)
-                        return DummyResult(None)
-            return Q()
-        def add(self, obj):
-            if isinstance(obj, User):
-                obj.id = len(self.users) + 1  # Set ID for the user
-                self.users[obj.username] = obj
-            if isinstance(obj, PgpKey):
-                self.pgp_keys.append(obj)
-        def commit(self):
-            self.committed = True
-        def close(self):
-            pass
-        def refresh(self, obj):
-            if isinstance(obj, User):
-                # Make sure the user has all required attributes
-                if not hasattr(obj, 'password_hash'):
-                    obj.password_hash = hash_password('pw')
-    class DummyResult:
-        def __init__(self, val):
-            self.val = val
-        def first(self):
-            return self.val
-    monkeypatch.setattr('db.database.get_session', lambda: DummySession())
+    """Test user registration and login with simplified mocking."""
+    import sys
     sys.path.insert(0, '.')
-    app_mod = importlib.import_module('app')
-    app = app_mod.app
-    with app.app_context():
-        us = UserService()
-        user, keypair = us.register_user('alice', 'pw', 'PUB', 'PRIV')
-        assert user is not None, "register_user returned None for user"
-        assert cast(User, user).username == 'alice'
-        user2, _ = us.login_user('alice', 'pw')
-        assert user2 is not None
-        user2 = cast(User, user2)
-        assert user2.username == 'alice'
-        assert user2.username == 'alice'
-        user3, err = us.login_user('alice', 'wrong')
-        assert user3 is None
-        assert err == 'Invalid credentials'
-        user4, err = us.register_user('alice', 'pw', 'PUB', 'PRIV')
-        assert user4 is None
-        assert err == 'Username already exists'
+    from unittest.mock import Mock, patch
+    from models.user import User
+    from models.pgp_key import PgpKey
+    
+    # Mock user storage
+    users_db = {}
+    
+    def mock_generate_gpg_keypair(name, email, passphrase):
+        return "MOCK_PUBLIC_KEY", "MOCK_PRIVATE_KEY"
+    
+    def create_mock_session():
+        mock_session = Mock()
+        mock_query = Mock()
+        mock_filter_by = Mock()
+        mock_result = Mock()
+        
+        # Setup the chain: session.query().filter_by().first()
+        def filter_by_func(**kwargs):
+            if 'username' in kwargs:
+                username = kwargs['username']
+                existing_user = users_db.get(username)
+                mock_result.first.return_value = existing_user
+            elif 'user_id' in kwargs and 'key_type' in kwargs:
+                # For PGP key queries, return None (no existing keys)
+                mock_result.first.return_value = None
+            return mock_result
+        
+        mock_query.filter_by = filter_by_func
+        mock_session.query.return_value = mock_query
+        
+        # Mock add method to store users
+        def add_func(obj):
+            if isinstance(obj, User):
+                obj.id = len(users_db) + 1
+                users_db[obj.username] = obj
+            # For PGP keys, just ignore
+        
+        mock_session.add = add_func
+        mock_session.commit = Mock()
+        mock_session.refresh = Mock()
+        mock_session.close = Mock()
+        
+        return mock_session
+    
+    # Use patch instead of monkeypatch for better control
+    with patch('db.database.get_session', create_mock_session):
+        with patch('utils.gpg_utils.generate_gpg_keypair', mock_generate_gpg_keypair):
+            from services.user_service import UserService
+            import importlib
+            app_mod = importlib.import_module('app')
+            app = app_mod.app
+            
+            with app.app_context():
+                us = UserService()
+                
+                # Test user registration with unique username
+                import uuid
+                unique_user = f"testuser_{str(uuid.uuid4())[:8]}"
+                user, result = us.register_user(unique_user, 'testpass', 'PUBLIC_KEY_DATA', 'PRIVATE_KEY_DATA')
+                assert user is not None, f"Registration should succeed, got error: {result}"
+                assert user.username == unique_user
+                assert hasattr(user, 'api_key')
+                assert user.api_key is not None
+                
+                # Test successful login
+                user2, keypair2 = us.login_user(unique_user, 'testpass')
+                assert user2 is not None, "Login should succeed"
+                assert user2.username == unique_user
+                
+                # Test failed login with wrong password
+                user3, err = us.login_user(unique_user, 'wrongpass')
+                assert user3 is None
+                assert err == 'Invalid credentials'
+                
+                # Test duplicate registration
+                user4, err = us.register_user(unique_user, 'testpass', 'PUB', 'PRIV')
+                assert user4 is None
+                assert err == 'Username already exists'

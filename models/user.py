@@ -34,10 +34,10 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, unique=True, nullable=False)
     password_hash = db.Column(db.String, nullable=False)
-    api_key = db.Column(db.String, unique=True, nullable=True)
+    api_key = db.Column(db.String, unique=True, nullable=False)
     pgp_keys = db.relationship('PgpKey', back_populates='user', cascade="all, delete-orphan")
 
-    def __init__(self, username: str, password_hash: str, api_key: str | None = None, **kwargs):
+    def __init__(self, username: str, password_hash: str, api_key: str, **kwargs):
         """
         Initialize a new User instance.
         

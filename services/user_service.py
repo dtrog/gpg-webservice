@@ -71,11 +71,14 @@ class UserService:
         """
         session = get_session()
         try:
-            if session.query(User).filter_by(username=username).first():
-                return None, 'Username already exists'
-            password_hash = hash_password(password)
-            api_key = generate_api_key()
-            user = User(username=username, password_hash=password_hash, api_key=api_key)
+            # Check if user already exists
+            existing_user = session.query(User).filter_by(username=username).first()
+            if existing_user:
+                return None, "Username already exists"
+            # Hash the provided password
+            password_hash_val = hash_password(password)
+            # Create user with hashed password
+            user = User(username=username, password_hash=password_hash_val, api_key=generate_api_key())
             session.add(user)
             session.commit()
             session.refresh(user)  # Ensure user.id is populated
@@ -92,7 +95,7 @@ class UserService:
                 # Use username as email if no email provided
                 email = f"{username}@example.com"  # Default email format
                 # Use SHA256 hash of API key as GPG passphrase for security and consistency
-                gpg_passphrase = api_key_to_gpg_passphrase(api_key)
+                gpg_passphrase = api_key_to_gpg_passphrase(user_api_key)
                 public_key_data, private_key_data = generate_gpg_keypair(username, email, gpg_passphrase)
             
             # Add PGP keys

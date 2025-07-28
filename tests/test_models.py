@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from models import User, PgpKey, PgpKeyPair, Challenge
+from utils.crypto_utils import generate_api_key
 from datetime import datetime, timezone
 
 def test_user_model_init():
@@ -12,7 +13,7 @@ def test_user_model_init():
     assert user.api_key == 'key123'
 
 def test_pgpkey_model_init():
-    user = User(username='bob2', password_hash='hash2')
+    user = User(username='bob2', password_hash='hash2', api_key=generate_api_key())
     key = PgpKey(user_id=1, key_type='public', key_data='PUBKEYDATA', user=user)
     assert key.user_id == 1
     assert key.key_type == 'public'
@@ -20,7 +21,7 @@ def test_pgpkey_model_init():
     assert key.user == user
 
 def test_pgpkeypair():
-    user = User(username='bob', password_hash='hash')
+    user = User(username='bob', password_hash='hash', api_key=generate_api_key())
     pub = PgpKey(user_id=1, key_type='public', key_data='PUB', user=user)
     priv = PgpKey(user_id=1, key_type='private', key_data='PRIV', user=user)
     pair = PgpKeyPair(pub, priv)
@@ -35,7 +36,7 @@ def test_apikey_model_init():
     assert user.api_key == 'apikey123'
 
 def test_challenge_model_init():
-    user = User(username='dave', password_hash='hash4')
+    user = User(username='dave', password_hash='hash4', api_key=generate_api_key())
     # Simulate user.id assignment as would happen in a real DB session
     user.id = 3
     now = datetime.now(timezone.utc)
