@@ -10,7 +10,9 @@ All cryptographic endpoints require authentication using an API key provided in 
 X-API-KEY: your_api_key_here
 ```
 
-API keys are obtained through user registration or login endpoints.
+API keys are obtained through user registration or login endpoints. All endpoints are protected by rate limiting:
+- **Authentication endpoints**: 5 requests per minute per IP
+- **API endpoints**: 30 requests per minute per IP
 
 ## Base URL
 
@@ -32,10 +34,22 @@ Creates a new user account with automatic GPG key generation.
 ```json
 {
   "username": "alice",
-  "password": "secure_password123",
+  "password": "SecurePass123!",
   "email": "alice@example.com"
 }
 ```
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one digit
+- At least one special character (!@#$%^&*(),.?":{}|<>)
+
+**Username Requirements:**
+- 3-50 characters
+- Alphanumeric characters, underscores, and hyphens only
+- Reserved usernames (admin, root, etc.) are not allowed
 
 **Response (201 Created):**
 ```json
@@ -118,7 +132,7 @@ Signs a file using the user's private key. Returns a detached signature.
 **Authentication Required:** Yes
 
 **Request (multipart/form-data):**
-- `file`: The file to sign (binary)
+- `file`: The file to sign (binary, max 5MB)
 
 **Response (200 OK):**
 - Binary signature file (`.sig`)
@@ -136,6 +150,13 @@ Signs a file using the user's private key. Returns a detached signature.
 ```json
 {
   "error": "Private key not found"
+}
+```
+
+**Response (400 Bad Request - File Too Large):**
+```json
+{
+  "error": "File size exceeds 5MB limit"
 }
 ```
 
@@ -417,6 +438,14 @@ Returned when using incorrect HTTP method:
 ```json
 {
   "error": "Method not allowed"
+}
+```
+
+### 429 Too Many Requests
+Returned when rate limits are exceeded:
+```json
+{
+  "error": "Rate limit exceeded. Please try again later."
 }
 ```
 

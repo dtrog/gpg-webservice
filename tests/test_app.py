@@ -7,7 +7,7 @@ import pytest
 from app import app, init_db
 
 def test_get_public_key(client):
-    api_key, pubkey = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, pubkey = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     rv = client.get('/get_public_key', headers={'X-API-KEY': api_key})
     assert rv.status_code == 200
     data = rv.get_json()
@@ -15,8 +15,8 @@ def test_get_public_key(client):
     assert data['public_key'] == pubkey
 
 def test_get_api_key(client):
-    api_key, _ = register_user(client, 'bob', 'builder', 'bob@example.com')
-    api_key2 = login_user(client, 'bob', 'builder')
+    api_key, _ = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
+    api_key2 = login_user(client, 'bob', 'Builder123!')
     assert api_key2 == api_key
 
 @pytest.fixture
@@ -51,6 +51,8 @@ def register_user(client, username, password, email=None):
         'email': email or f'{username}@example.com'
         # No public_key/private_key provided - let system generate them
     })
+    if rv.status_code != 201:
+        print(f"Registration failed: {rv.get_json()}")
     assert rv.status_code == 201  # Registration should return 201 Created
     data = rv.get_json()
     return data['api_key'], data['public_key']
@@ -64,17 +66,17 @@ def login_user(client, username, password):
     return rv.get_json()['api_key']
 
 def test_register(client):
-    api_key, pubkey = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, pubkey = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     assert api_key
     assert pubkey
 
 def test_login(client):
-    api_key, _ = register_user(client, 'bob', 'builder', 'bob@example.com')
-    api_key2 = login_user(client, 'bob', 'builder')
+    api_key, _ = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
+    api_key2 = login_user(client, 'bob', 'Builder123!')
     assert api_key2 == api_key
 
 def test_sign(client):
-    api_key, _ = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, _ = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(b'goodbye world')
         f.flush()
@@ -87,7 +89,7 @@ def test_sign(client):
     os.unlink(fname)
 
 def test_verify(client):
-    api_key, pubkey = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, pubkey = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(b'goodbye world')
         f.flush()
@@ -117,7 +119,7 @@ def test_verify(client):
     os.unlink(pubfname)
 
 def test_encrypt(client):
-    api_key, pubkey = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, pubkey = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(b'goodbye world')
         f.flush()
@@ -144,7 +146,7 @@ def test_encrypt(client):
     os.unlink(encfname)
 
 def test_decrypt(client):
-    api_key, pubkey = register_user(client, 'bob', 'builder', 'bob@example.com')
+    api_key, pubkey = register_user(client, 'bob', 'Builder123!', 'bob@example.com')
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(b'goodbye world')
         f.flush()

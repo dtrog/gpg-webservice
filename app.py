@@ -12,6 +12,8 @@ import base64
 
 from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
+from routes.openai_routes import openai_bp
+from utils.security_utils import add_security_headers
 
 app = Flask(__name__)
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/gpg_uploads')
@@ -23,6 +25,12 @@ init_db(app)
 # Register blueprints
 app.register_blueprint(user_bp)
 app.register_blueprint(gpg_bp)
+app.register_blueprint(openai_bp)
+
+# Add security headers to all responses
+@app.after_request
+def after_request(response):
+    return add_security_headers(response)
 
 # This block allows the app to be run directly for development purposes
 if __name__ == '__main__':

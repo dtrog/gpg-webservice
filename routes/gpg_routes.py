@@ -1,8 +1,4 @@
 from flask import Blueprint, request, jsonify, current_app, send_file
-
-# GPG-related routes
-
-gpg_bp = Blueprint('gpg', __name__)
 from werkzeug.utils import secure_filename
 import tempfile
 import os
@@ -10,16 +6,21 @@ import hashlib
 from functools import wraps
 from db.database import db
 from models.user import User
-from models.pgp_key import PgpKey
+from models.pgp_key import PgpKey, PgpKeyType
 from services.challenge_service import ChallengeService
-from utils.crypto_utils import decrypt_private_key
+from utils.crypto_utils import decrypt_private_key, derive_gpg_passphrase
+from utils.security_utils import rate_limit_api, validate_file_upload, secure_temp_directory
 from services.auth_service import get_user_by_api_key
 from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file, decrypt_file_with_passphrase
 
+# GPG-related routes
 gpg_bp = Blueprint('gpg', __name__)
 
+# Deprecated: Use derive_gpg_passphrase from crypto_utils instead
 def api_key_to_gpg_passphrase(api_key: str) -> str:
     """Convert API key to a suitable GPG passphrase using SHA256 hash."""
+    import warnings
+    warnings.warn("api_key_to_gpg_passphrase is deprecated, use derive_gpg_passphrase from crypto_utils", DeprecationWarning)
     return hashlib.sha256(api_key.encode('utf-8')).hexdigest()
 
 # --- API Key Auth Decorator ---
@@ -37,23 +38,30 @@ def require_api_key(f):
 
 # --- SIGN ---
 @gpg_bp.route('/sign', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def sign(user):
     if 'file' not in request.files:
         return jsonify({'error': 'file required'}), 400
     file = request.files['file']
+    
+    # Validate file upload
+    valid, error = validate_file_upload(file, max_size_mb=5)
+    if not valid:
+        return jsonify({'error': error}), 400
+    
     filename = secure_filename(file.filename or 'file')
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, filename)
         file.save(input_path)
         # Get encrypted private key
-        privkey = PgpKey.query.filter_by(user_id=user.id, key_type='private').first()
+        privkey = PgpKey.query.filter_by(user_id=user.id, key_type=PgpKeyType.PRIVATE).first()
         if not privkey:
             return jsonify({'error': 'Private key not found'}), 404
         sig_path = os.path.join(tmpdir, filename + '.sig')
         try:
-            # Use SHA256 hash of the user's API key as the GPG passphrase
-            gpg_passphrase = api_key_to_gpg_passphrase(user.api_key)
+            # Use secure passphrase derivation with user ID as salt
+            gpg_passphrase = derive_gpg_passphrase(user.api_key, user.id)
             sign_file(input_path, privkey.key_data, sig_path, gpg_passphrase)
         except Exception as e:
             return jsonify({'error': f'Signing failed: {str(e)}'}), 500
@@ -61,12 +69,19 @@ def sign(user):
 
 # --- VERIFY ---
 @gpg_bp.route('/verify', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def verify(user):
     if 'file' not in request.files or 'pubkey' not in request.files:
         return jsonify({'error': 'file and pubkey required'}), 400
     sig_file = request.files['file']  # This is the signature file
     pubkey_file = request.files['pubkey']  # This is the public key file
+    
+    # Validate file uploads
+    for file_obj, name in [(sig_file, 'signature file'), (pubkey_file, 'public key file')]:
+        valid, error = validate_file_upload(file_obj, max_size_mb=1)
+        if not valid:
+            return jsonify({'error': f'{name}: {error}'}), 400
     
     sig_filename = secure_filename(sig_file.filename or 'file.sig')
     pubkey_filename = secure_filename(pubkey_file.filename or 'pubkey')
@@ -116,12 +131,19 @@ def verify(user):
 
 # --- ENCRYPT ---
 @gpg_bp.route('/encrypt', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def encrypt(user):
     if 'file' not in request.files or 'pubkey' not in request.files:
         return jsonify({'error': 'file and pubkey required'}), 400
     file = request.files['file']
     pubkey_file = request.files['pubkey']
+    
+    # Validate file uploads
+    for file_obj, name in [(file, 'data file'), (pubkey_file, 'public key file')]:
+        valid, error = validate_file_upload(file_obj, max_size_mb=10)
+        if not valid:
+            return jsonify({'error': f'{name}: {error}'}), 400
     filename = secure_filename(file.filename or 'file')
     pubkey_filename = secure_filename(pubkey_file.filename or 'pubkey')
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -141,23 +163,29 @@ def encrypt(user):
 
 # --- DECRYPT ---
 @gpg_bp.route('/decrypt', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def decrypt(user):
     if 'file' not in request.files:
         return jsonify({'error': 'file required'}), 400
     file = request.files['file']
+    
+    # Validate file upload
+    valid, error = validate_file_upload(file, max_size_mb=10)
+    if not valid:
+        return jsonify({'error': error}), 400
     filename = secure_filename(file.filename or 'file')
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, filename)
         file.save(input_path)
         # Get private key
-        privkey = PgpKey.query.filter_by(user_id=user.id, key_type='private').first()
+        privkey = PgpKey.query.filter_by(user_id=user.id, key_type=PgpKeyType.PRIVATE).first()
         if not privkey:
             return jsonify({'error': 'Private key not found'}), 404
         dec_path = os.path.join(tmpdir, filename + '.dec')
         try:
-            # Use SHA256 hash of the user's API key as the GPG passphrase
-            gpg_passphrase = api_key_to_gpg_passphrase(user.api_key)
+            # Use secure passphrase derivation with user ID as salt
+            gpg_passphrase = derive_gpg_passphrase(user.api_key, user.id)
             decrypt_file(input_path, privkey.key_data, dec_path, gpg_passphrase)
         except Exception as e:
             return jsonify({'error': f'Decryption failed: {str(e)}'}), 500
@@ -165,6 +193,7 @@ def decrypt(user):
 
 # --- CHALLENGE ---
 @gpg_bp.route('/challenge', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def challenge(user):
     challenge_service = ChallengeService()
@@ -173,6 +202,7 @@ def challenge(user):
 
 # --- VERIFY CHALLENGE ---
 @gpg_bp.route('/verify_challenge', methods=['POST'])
+@rate_limit_api
 @require_api_key
 def verify_challenge(user):
     data = request.get_json()
@@ -189,9 +219,10 @@ def verify_challenge(user):
 
 # --- GET PUBLIC KEY ---
 @gpg_bp.route('/get_public_key', methods=['GET'])
+@rate_limit_api
 @require_api_key
 def get_public_key(user):
-    pubkey = PgpKey.query.filter_by(user_id=user.id, key_type='public').first()
+    pubkey = PgpKey.query.filter_by(user_id=user.id, key_type=PgpKeyType.PUBLIC).first()
     if not pubkey:
         return jsonify({'error': 'Public key not found'}), 404
     return jsonify({'public_key': pubkey.key_data}), 200

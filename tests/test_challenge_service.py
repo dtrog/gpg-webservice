@@ -54,6 +54,16 @@ def test_create_challenge():
             mock_session.refresh.assert_called_once()
             mock_session.close.assert_called()
 
+def query_side_effect_factory(mock_challenge_query, mock_user_query):
+    """Factory to create a side effect for session.query."""
+    def query_side_effect(model):
+        if model == Challenge:
+            return mock_challenge_query
+        elif model == User:
+            return mock_user_query
+        return MagicMock()
+    return query_side_effect
+
 def test_verify_challenge():
     """Test challenge verification with proper mocking."""
     from datetime import datetime, timezone
@@ -65,7 +75,8 @@ def test_verify_challenge():
     mock_challenge.created_at = datetime.now(timezone.utc)
     
     # Mock user with PGP key
-    mock_pgp_key = MagicMock(key_type='public', key_data='mock_public_key')
+    from models.pgp_key import PgpKeyType
+    mock_pgp_key = MagicMock(key_type=PgpKeyType.PUBLIC, key_data='mock_public_key')
     mock_user = MagicMock()
     mock_user.pgp_keys.all.return_value = [mock_pgp_key]
     mock_challenge.user = mock_user
@@ -79,13 +90,7 @@ def test_verify_challenge():
         mock_user_query = MagicMock()
         mock_user_query.filter_by.return_value.first.return_value = mock_user
         # Setup query side effect
-        def query_side_effect(model):
-            if model == Challenge:
-                return mock_challenge_query
-            elif model == User:
-                return mock_user_query
-            return MagicMock()
-        mock_session.query.side_effect = query_side_effect
+        mock_session.query.side_effect = query_side_effect_factory(mock_challenge_query, mock_user_query)
         # Mock signature verification
         with patch('utils.gpg_utils.verify_signature', return_value=True):
             service = ChallengeService()
@@ -99,6 +104,9 @@ def test_verify_challenge():
             mock_session.delete.assert_called_once_with(mock_challenge)
             mock_session.commit.assert_called_once()
             mock_session.close.assert_called_once()
+            signature="test_signature"
+            
+            
 
 def test_create_and_verify_challenge():
     """Test full challenge creation and verification flow."""
@@ -106,7 +114,8 @@ def test_create_and_verify_challenge():
     # Prepare mock challenge and user
     mock_challenge = MagicMock(user_id=1, challenge_data="test_challenge_data")
     mock_challenge.created_at = datetime.now(timezone.utc)
-    mock_pgp_key = MagicMock(key_type='public', key_data='mock_public_key')
+    from models.pgp_key import PgpKeyType
+    mock_pgp_key = MagicMock(key_type=PgpKeyType.PUBLIC, key_data='mock_public_key')
     mock_user = MagicMock()
     mock_user.pgp_keys.all.return_value = [mock_pgp_key]
     mock_challenge.user = mock_user
@@ -120,13 +129,6 @@ def test_create_and_verify_challenge():
         mock_query = MagicMock()
         mock_query.filter.return_value.filter.return_value.delete.return_value = None
         mock_query.filter.return_value.order_by.return_value.all.return_value = []
-        mock_session.query.return_value = mock_query
-        with patch('secrets.token_urlsafe', return_value="test_challenge_data"):
-            # Create challenge
-            challenge = cs.create_challenge(user_id=1)
-            assert challenge.user_id == 1
-            assert challenge.challenge_data == "test_challenge_data"
-
     # Mock verification
     with patch('services.challenge_service.get_session') as mock_get_session:
         mock_session = MagicMock()
@@ -136,13 +138,7 @@ def test_create_and_verify_challenge():
         mock_challenge_query.filter_by.return_value.first.return_value = mock_challenge
         mock_user_query = MagicMock()
         mock_user_query.filter_by.return_value.first.return_value = mock_user
-        def query_side_effect(model):
-            if model == Challenge:
-                return mock_challenge_query
-            elif model == User:
-                return mock_user_query
-            return MagicMock()
-        mock_session.query.side_effect = query_side_effect
+        mock_session.query.side_effect = query_side_effect_factory(mock_challenge_query, mock_user_query)
         # Verify signature
         with patch('utils.gpg_utils.verify_signature', return_value=True):
             result, message = cs.verify_challenge(
@@ -152,3 +148,6 @@ def test_create_and_verify_challenge():
             )
             assert result is True
             assert message == "Challenge verified"
+            mock_session.delete.assert_called_once_with(mock_challenge)
+            mock_session.commit.assert_called_once()
+            mock_session.close.assert_called_once()

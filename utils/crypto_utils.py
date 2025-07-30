@@ -88,6 +88,44 @@ def decrypt_private_key(enc: bytes, password: str) -> bytes:
     return aesgcm.decrypt(nonce, ct, None)
 
 
+def derive_gpg_passphrase(api_key: str, user_id: int) -> str:
+    """
+    Derive a secure GPG passphrase from API key and user ID using PBKDF2.
+    
+    This function creates a deterministic but secure passphrase for GPG operations
+    by using PBKDF2-HMAC-SHA256 with the API key as the password and a salt 
+    derived from the user ID. This provides better security than simple SHA256
+    hashing while remaining deterministic for the same inputs.
+    
+    Args:
+        api_key (str): The user's API key
+        user_id (int): The user's unique ID for salt derivation
+        
+    Returns:
+        str: A 64-character hexadecimal string suitable for use as a GPG passphrase
+    """
+    import hashlib
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    
+    # Create a deterministic salt from user_id 
+    # Use a fixed string prefix to ensure salt uniqueness across different uses
+    salt_data = f"gpg_passphrase_salt_{user_id}".encode('utf-8')
+    salt = hashlib.sha256(salt_data).digest()
+    
+    # Derive key using PBKDF2-HMAC-SHA256
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,  # 32 bytes = 256 bits
+        salt=salt,
+        iterations=100000,  # OWASP recommended minimum
+    )
+    key = kdf.derive(api_key.encode('utf-8'))
+    
+    # Return as hexadecimal string for GPG compatibility
+    return key.hex()
+
+
 def generate_api_key() -> str:
     """
     Generate a secure, random API key.

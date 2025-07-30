@@ -6,11 +6,13 @@ The GPG Webservice is a Flask-based application that provides secure GPG cryptog
 
 ### Core Design Principles
 
-1. **Security First**: All private keys are protected with passphrases derived from API keys
+1. **Security First**: Enhanced PBKDF2-HMAC-SHA256 key derivation with user-specific salts
 2. **Complete Isolation**: GPG operations use temporary keyrings to prevent conflicts
 3. **No Interactive Prompts**: Docker environment ensures fully automated operations
 4. **Stateless Operations**: Each request is independent with proper cleanup
-5. **Type Safety**: Comprehensive type hints and documentation throughout
+5. **Type Safety**: Comprehensive type hints and enum-based database models
+6. **Input Validation**: Comprehensive validation for all user inputs and file uploads
+7. **Rate Limiting**: Configurable rate limits for authentication and API endpoints
 
 ## System Components
 
@@ -19,14 +21,16 @@ The GPG Webservice is a Flask-based application that provides secure GPG cryptog
 The data layer uses SQLAlchemy with three main models:
 
 #### User Model (`models/user.py`)
-- Stores user credentials and API keys
+- Stores user credentials and API keys with strong password requirements
 - Maintains relationships with PGP keys
-- Password hashes use SHA256 (simplified for demo; production should use Argon2id)
+- Password hashes use Argon2id for production-grade security
+- Enforces username validation and reserved name protection
 
 #### PgpKey Model (`models/pgp_key.py`) 
+- Polymorphic model with enum-based type safety (PUBLIC/PRIVATE)
 - Stores ASCII-armored public and private keys
 - Associated with users via foreign key relationship
-- Private keys protected with SHA256(API_key) as passphrase
+- Private keys protected with PBKDF2-HMAC-SHA256 derived passphrases
 
 #### Challenge Model (`models/challenge.py`)
 - Supports challenge-response authentication
@@ -38,13 +42,14 @@ The data layer uses SQLAlchemy with three main models:
 Business logic is separated into focused service classes:
 
 #### UserService (`services/user_service.py`)
-- **Registration**: Creates users with automatic GPG key generation
-- **Authentication**: Validates credentials and returns user data
-- **Key Management**: Coordinates GPG key creation with API key derivation
+- **Registration**: Creates users with comprehensive input validation and automatic GPG key generation
+- **Authentication**: Validates credentials with rate limiting protection
+- **Key Management**: Coordinates GPG key creation with enhanced key derivation
 
 Key Features:
 - Generates RSA 3072-bit keypairs automatically
-- Uses `SHA256(API_key)` as GPG passphrase for security
+- Uses PBKDF2-HMAC-SHA256 with user-specific salts for GPG passphrase security
+- Enforces strong password complexity requirements
 - Returns detached objects to avoid SQLAlchemy session issues
 
 #### AuthService (`services/auth_service.py`)
@@ -57,9 +62,16 @@ Key Features:
 Cryptographic and GPG operations are handled by specialized utilities:
 
 #### CryptoUtils (`utils/crypto_utils.py`)
-- **Key Derivation**: Argon2id-based password-to-key derivation
+- **Enhanced Key Derivation**: PBKDF2-HMAC-SHA256 for GPG passphrase derivation with 100,000 iterations
+- **Password-to-Key Derivation**: Argon2id-based password-to-key derivation
 - **Symmetric Encryption**: AES-GCM for private key protection
 - **API Key Generation**: Secure random API key creation using 256 bits of entropy
+
+#### SecurityUtils (`utils/security_utils.py`) - NEW
+- **Rate Limiting**: IP-based rate limiting with sliding window algorithm
+- **Input Validation**: Comprehensive validation for usernames, passwords, emails, and files
+- **Security Headers**: HTTP security headers implementation
+- **File Upload Security**: Size limits and extension validation
 
 #### GPG Utils (`utils/gpg_utils.py`)
 - **Key Generation**: Creates RSA 3072-bit keypairs with optional passphrases
@@ -76,38 +88,48 @@ Cryptographic and GPG operations are handled by specialized utilities:
 HTTP endpoints organized by functionality:
 
 #### User Routes (`routes/user_routes.py`)
-- `POST /register`: User registration with key generation
-- `POST /login`: Authentication and API key retrieval
+- `POST /register`: User registration with comprehensive validation, strong password requirements, and key generation
+- `POST /login`: Authentication with rate limiting and API key retrieval
 
 #### GPG Routes (`routes/gpg_routes.py`)
-- `POST /sign`: File signing (no password required - uses API key)
-- `POST /verify`: Signature verification with public key upload
-- `POST /encrypt`: File encryption for recipients
-- `POST /decrypt`: File decryption (no password required - uses API key)
-- `POST /challenge`: Challenge-response authentication
-- `GET /get_public_key`: Public key retrieval
+- `POST /sign`: File signing with size limits and security validation
+- `POST /verify`: Signature verification with public key upload and validation
+- `POST /encrypt`: File encryption for recipients with enhanced security
+- `POST /decrypt`: File decryption with comprehensive error handling
+- `POST /challenge`: Challenge-response authentication with enum support
+- `GET /get_public_key`: Public key retrieval with rate limiting protection
+
+All endpoints include:
+- Rate limiting protection (30 requests/minute per IP)
+- Input validation and sanitization
+- File upload security (size limits, extension validation)
+- Enhanced error handling with secure error messages
 
 ## Security Architecture
 
 ### Authentication Flow
 
 1. **Registration**: 
-   - User provides username/password
-   - System generates secure API key
-   - GPG keypair created with `SHA256(API_key)` as passphrase
-   - All data stored in database
+   - User provides username/password/email with comprehensive validation
+   - Strong password requirements enforced (8+ chars, complexity)
+   - System generates secure API key (256-bit entropy)
+   - GPG keypair created with PBKDF2-HMAC-SHA256 derived passphrase
+   - All data stored in database with enum type safety
 
 2. **API Access**:
    - Client includes `X-API-KEY` header
+   - Rate limiting applied (30 requests/minute per IP)
    - System validates API key and retrieves user
-   - GPG operations use derived passphrase automatically
+   - GPG operations use enhanced derived passphrase automatically
 
 ### Key Protection Strategy
 
 - **API Key**: 32 random bytes, base64url encoded (~256 bits entropy)
-- **GPG Passphrase**: `SHA256(API_key)` - deterministic, secure, no special characters
-- **Private Keys**: Stored as ASCII-armored text with passphrase protection
-- **Database**: Only stores hashed passwords, never plaintext
+- **GPG Passphrase**: PBKDF2-HMAC-SHA256 with user-specific salt and 100,000 iterations
+- **Private Keys**: Stored as ASCII-armored text with enhanced passphrase protection
+- **Database**: Argon2id password hashing, enum type safety, comprehensive constraints
+- **Input Validation**: All inputs validated and sanitized before processing
+- **Rate Limiting**: IP-based rate limiting prevents abuse and brute force attacks
 
 ### Isolation Techniques
 
@@ -193,16 +215,20 @@ Each test uses:
 ### Threat Model
 
 **Protected Against:**
-- API key theft (GPG keys still protected by derived passphrase)
-- Database compromise (passwords hashed, keys passphrase-protected)
+- API key theft (GPG keys protected by PBKDF2-derived passphrase)
+- Database compromise (Argon2id password hashing, keys passphrase-protected)
 - GPG agent interference (complete isolation)
 - Interactive prompts (Docker environment prevents)
+- Brute force attacks (rate limiting, strong password requirements)
+- Input validation attacks (comprehensive validation and sanitization)
+- File upload attacks (size limits, extension validation)
+- Clickjacking and XSS (comprehensive security headers)
 
 **Potential Vulnerabilities:**
 - API key exposure in logs/memory dumps
 - Temporary file access during processing
 - Side-channel attacks on key operations
-- Insufficient rate limiting
+- Advanced persistent threats requiring additional monitoring
 
 ### Production Hardening
 
@@ -211,7 +237,8 @@ For production deployment, consider:
 1. **Enhanced Authentication**: 
    - API key rotation mechanisms
    - Multi-factor authentication
-   - Rate limiting and request throttling
+   - Advanced rate limiting and request throttling (implemented)
+   - Challenge-response authentication (implemented)
 
 2. **Key Protection**:
    - Hardware Security Module (HSM) integration

@@ -1,6 +1,7 @@
 # Challenge service for challenge/response logic
 
 from models.challenge import Challenge
+from models.pgp_key import PgpKeyType
 from db.database import get_session
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import asc, desc
@@ -24,7 +25,6 @@ class ChallengeService:
         cutoff = datetime.now(timezone.utc) - timedelta(days=self.MAX_AGE_DAYS)
         session.query(Challenge).filter(getattr(Challenge, 'user_id') == user_id).filter(getattr(Challenge, 'created_at') < cutoff).delete()
         # Remove oldest if more than MAX_CHALLENGES_PER_USER
-        challenges = session.query(Challenge).filter_by(user_id=user_id).order_by(Challenge.created_at).all()
         challenges = session.query(Challenge).filter_by(user_id=user_id).order_by(Challenge.created_at).all()
         if len(challenges) > self.MAX_CHALLENGES_PER_USER:
             for c in challenges[:len(challenges) - self.MAX_CHALLENGES_PER_USER]:
@@ -74,7 +74,7 @@ class ChallengeService:
             return False, 'User not found'
         public_key_obj = None
         for key in user.pgp_keys.all():
-            if key.key_type == 'public':
+            if key.key_type == PgpKeyType.PUBLIC:
                 public_key_obj = key
                 break
         if not public_key_obj:

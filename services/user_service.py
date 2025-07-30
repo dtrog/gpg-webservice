@@ -7,14 +7,21 @@ models, authentication system, and GPG key generation.
 """
 
 import hashlib
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, NamedTuple
 from models.user import User
-from models.pgp_key import PgpKey, PgpKeyPair
+from models.pgp_key import PublicPgpKey, PrivatePgpKey, PgpKey
 from db.database import get_session
 from services.auth_service import hash_password, verify_password
-from utils.crypto_utils import generate_api_key
+from utils.crypto_utils import generate_api_key, derive_gpg_passphrase
 
 
+class PgpKeyPair(NamedTuple):
+    """Named tuple for holding a public/private key pair."""
+    public_key: Optional[PublicPgpKey]
+    private_key: Optional[PrivatePgpKey]
+
+
+# Deprecated: Use derive_gpg_passphrase from crypto_utils instead
 def api_key_to_gpg_passphrase(api_key: str) -> str:
     """
     Convert API key to a suitable GPG passphrase using SHA256 hash.
@@ -29,6 +36,8 @@ def api_key_to_gpg_passphrase(api_key: str) -> str:
     Returns:
         str: A 64-character hexadecimal string suitable for use as a GPG passphrase
     """
+    import warnings
+    warnings.warn("api_key_to_gpg_passphrase is deprecated, use derive_gpg_passphrase from crypto_utils", DeprecationWarning)
     return hashlib.sha256(api_key.encode('utf-8')).hexdigest()
 
 
@@ -50,7 +59,7 @@ class UserService:
         password: str, 
         public_key_data: Optional[str] = None, 
         private_key_data: Optional[str] = None
-    ) -> Tuple[Optional[object], Union[str, PgpKeyPair]]:
+    ) -> Tuple[Optional[object], Union[str, 'PgpKeyPair']]:
         """
         Register a new user account with PGP keys.
         
@@ -65,7 +74,7 @@ class UserService:
             private_key_data (str, optional): ASCII-armored private key. Generated if not provided.
             
         Returns:
-            Tuple[Optional[object], Union[str, PgpKeyPair]]: 
+            Tuple[Optional[object], Union[str, Tuple[PublicPgpKey, PrivatePgpKey]]]:
                 - Success: (SimpleUser object, PgpKeyPair object)
                 - Failure: (None, error_message_string)
         """
@@ -81,7 +90,7 @@ class UserService:
             user = User(username=username, password_hash=password_hash_val, api_key=generate_api_key())
             session.add(user)
             session.commit()
-            session.refresh(user)  # Ensure user.id is populated
+            session.refresh(user)  # Ensure user.id i
             
             # Store user ID before detaching
             user_id = user.id
@@ -94,13 +103,13 @@ class UserService:
                 from utils.gpg_utils import generate_gpg_keypair
                 # Use username as email if no email provided
                 email = f"{username}@example.com"  # Default email format
-                # Use SHA256 hash of API key as GPG passphrase for security and consistency
-                gpg_passphrase = api_key_to_gpg_passphrase(user_api_key)
+                # Use secure passphrase derivation with user ID as salt
+                gpg_passphrase = derive_gpg_passphrase(user_api_key, user_id)
                 public_key_data, private_key_data = generate_gpg_keypair(username, email, gpg_passphrase)
             
             # Add PGP keys
-            public_key = PgpKey(user_id=user.id, key_type='public', key_data=public_key_data)
-            private_key = PgpKey(user_id=user.id, key_type='private', key_data=private_key_data)
+            public_key = PublicPgpKey(key_data=public_key_data, user_id=user_id)
+            private_key = PrivatePgpKey(key_data=private_key_data, user_id=user_id)
             session.add(public_key)
             session.add(private_key)
             session.commit()
@@ -116,14 +125,16 @@ class UserService:
                     self.username = username
                     self.password_hash = password_hash
                     self.api_key = api_key
-            
+
             simple_user = SimpleUser(user_id, user_username, user_password_hash, user_api_key)
-            pgp_keypair = PgpKeyPair(public_key, private_key)
-            return simple_user, pgp_keypair
+            return simple_user, PgpKeyPair(public_key, private_key)
+        except Exception as e:
+            return None, f"Registration failed: {str(e)}"
+        
         finally:
             session.close()
 
-    def login_user(self, username: str, password: str) -> Tuple[Optional[object], Union[str, PgpKeyPair]]:
+    def login_user(self, username: str, password: str) -> Tuple[Optional[object], Union[str, 'PgpKeyPair']]:
         """
         Authenticate a user and return their account data.
         
@@ -153,8 +164,8 @@ class UserService:
             user_password_hash = user.password_hash
             
             # Fetch PGP keys
-            public_key = session.query(PgpKey).filter_by(user_id=user.id, key_type='public').first()
-            private_key = session.query(PgpKey).filter_by(user_id=user.id, key_type='private').first()
+            public_key = session.query(PublicPgpKey).filter_by(user_id=user.id).first()
+            private_key = session.query(PrivatePgpKey).filter_by(user_id=user.id).first()
             
             # Refresh objects to ensure they're properly loaded
             if public_key:
@@ -171,7 +182,7 @@ class UserService:
                     self.api_key = api_key
             
             simple_user = SimpleUser(user_id, user_username, user_password_hash, user_api_key)
-            pgp_keypair = PgpKeyPair(public_key, private_key)
-            return simple_user, pgp_keypair
+           
+            return simple_user, PgpKeyPair(public_key, private_key)
         finally:
             session.close()

@@ -1,6 +1,6 @@
 # GPG Webservice - Development Guide
 
-This guide provides comprehensive information for developers working on the GPG Webservice project, including setup instructions, development workflows, testing procedures, and contribution guidelines.
+This guide provides comprehensive information for developers working on the GPG Webservice project, including setup instructions, development workflows, testing procedures, security considerations, and contribution guidelines. The project has been enhanced with comprehensive security features including PBKDF2 key derivation, rate limiting, input validation, and HTTP security headers.
 
 ## Development Environment Setup
 

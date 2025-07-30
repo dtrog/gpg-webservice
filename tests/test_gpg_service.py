@@ -40,19 +40,33 @@ def test_gpg_service_sign_verify(monkeypatch):
 def test_gpg_service_encrypt_decrypt(monkeypatch):
     gs = GPGService()
     # Patch subprocess.run to simulate key id extraction and encryption
-    def fake_run(*a, **kw):
+    def fake_run(*args, **kwargs):
         class FakeResult:
-            def __init__(self, args):
+            def __init__(self, cmd_args):
                 self.returncode = 0
-                if '--list-keys' in args:
+                if '--list-keys' in cmd_args and '--with-colons' in cmd_args:
                     # Simulate a valid pub: line for GPGService (format: pub:trust:length:algo:keyid:...)
                     self.stdout = b'pub:u:2048:1:DUMMYKEYID123456:2021-01-01:::u:::scESC:::\n'
                 else:
                     self.stdout = b''
                 self.stderr = b''
-        return FakeResult(a[0])
+        return FakeResult(args[0])
+    
+    # Mock file operations to simulate successful file creation/reading
+    mock_file_content = ""
+    def mock_open_func(filename, mode='r'):
+        mock_file = MagicMock()
+        if 'w' in mode:
+            mock_file.write = MagicMock()
+        else:
+            mock_file.read = MagicMock(return_value=mock_file_content)
+        mock_file.__enter__ = MagicMock(return_value=mock_file)
+        mock_file.__exit__ = MagicMock()
+        return mock_file
+    
     monkeypatch.setattr('subprocess.run', fake_run)
-    monkeypatch.setattr('builtins.open', MagicMock())
+    monkeypatch.setattr('builtins.open', mock_open_func)
+    
     enc, err = gs.encrypt('data', 'pub')
     assert err is None
     dec, err = gs.decrypt('data', 'priv', 'pw')

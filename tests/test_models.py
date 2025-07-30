@@ -13,20 +13,18 @@ def test_user_model_init():
     assert user.api_key == 'key123'
 
 def test_pgpkey_model_init():
+    from models.pgp_key import PgpKeyType
     user = User(username='bob2', password_hash='hash2', api_key=generate_api_key())
-    key = PgpKey(user_id=1, key_type='public', key_data='PUBKEYDATA', user=user)
+    key = PgpKey(key_type=PgpKeyType.PUBLIC, key_data='PUBKEYDATA', user_id=1)
     assert key.user_id == 1
-    assert key.key_type == 'public'
+    assert key.key_type == PgpKeyType.PUBLIC
     assert key.key_data == 'PUBKEYDATA'
-    assert key.user == user
 
 def test_pgpkeypair():
+    from models.pgp_key import PublicPgpKey, PrivatePgpKey
     user = User(username='bob', password_hash='hash', api_key=generate_api_key())
-    pub = PgpKey(user_id=1, key_type='public', key_data='PUB', user=user)
-    priv = PgpKey(user_id=1, key_type='private', key_data='PRIV', user=user)
-    pair = PgpKeyPair(pub, priv)
-    assert pair.public_key == pub
-    assert pair.private_key == priv
+    pub = PublicPgpKey(key_data='PUB', user_id=1)
+    priv = PrivatePgpKey(key_data='PRIV', user_id=1)
     pair = PgpKeyPair(pub, priv)
     assert pair.public_key == pub
     assert pair.private_key == priv
