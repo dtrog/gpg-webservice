@@ -44,13 +44,16 @@ docker-compose run --rm test-runner pytest tests/test_app.py::test_register -v
 ### Local Development
 ```bash
 # Start development server
-docker-compose up webservice
+docker-compose up gpg-webservice
 
 # Initialize database locally
 python -c "from app import init_db; init_db()"
 
 # Start local Flask server
 python app.py
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### Database Operations
@@ -104,6 +107,7 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 - Mock external dependencies in unit tests
 - Test both success and failure scenarios for all endpoints
 - Verify proper cleanup of temporary resources
+- Use Docker environment variables for GPG isolation: `GPG_AGENT_INFO=""`, `GPG_TTY=""`
 
 ## Important Security Notes
 
@@ -119,3 +123,21 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 - Store uploads in temporary locations and clean up after processing
 - Validate file types and sizes before processing
 - Handle multipart/form-data correctly for file uploads with additional parameters
+
+## OpenAI Integration
+
+The service includes specialized endpoints for OpenAI function calling integration:
+- `/openai/function_definitions` - Get function definitions for OpenAI
+- `/openai/register_user` - Register user via AI function call
+- `/openai/sign_text` - Sign text content via AI function call
+- All OpenAI endpoints return structured JSON responses with `success`, `data`, and `message` fields
+
+## Dependencies
+
+Core dependencies from requirements.txt:
+- `flask` - Web framework
+- `flask-sqlalchemy` - Database ORM
+- `werkzeug` - WSGI utilities
+- `cryptography` - Cryptographic operations
+- `argon2-cffi` - Password hashing
+- `pytest` - Testing framework

@@ -3,56 +3,39 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import pytest
-from flask import Flask
 from unittest.mock import patch, MagicMock
 from services.challenge_service import ChallengeService
 from models.challenge import Challenge
 from models.user import User
 from models.pgp_key import PgpKey
-from db.database import init_db
 
-@pytest.fixture(scope="module")
-def app():
-    """Create a Flask app for testing."""
-    app = Flask(__name__)
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+def test_create_challenge(app, db_session):
+    """Test challenge creation with proper database session management."""
+    from db.database import db
+    import secrets
+    
     with app.app_context():
-        init_db(app)
-        yield app
-
-@pytest.fixture(autouse=True)
-def app_context(app: Flask):
-    """Ensure all tests run within Flask app context."""
-    with app.app_context():
-        yield
-
-def test_create_challenge():
-    """Test challenge creation with proper mocking."""
-    with patch('services.challenge_service.get_session') as mock_get_session:
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
+        # Create a test user first
+        user = User(username='testuser', password_hash='hashed_password', api_key='test_api_key')
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
         
-        # Mock the query for pruning old challenges
-        mock_query = MagicMock()
-        mock_query.filter.return_value.filter.return_value.delete.return_value = None
-        mock_query.filter.return_value.order_by.return_value.__getitem__.return_value = []
-        mock_session.query.return_value = mock_query
-        
-        with patch('secrets.token_urlsafe', return_value="test_challenge_data"):
+        # Mock get_session to return the same session as the test
+        with patch('services.challenge_service.get_session', return_value=db.session):
             service = ChallengeService()
-            result = service.create_challenge(user_id=1)
+            challenge = service.create_challenge(user_id=user_id)
             
             # Verify the challenge was created correctly
-            assert result.user_id == 1
-            assert result.challenge_data == "test_challenge_data"
+            assert challenge.user_id == user_id
+            assert challenge.challenge_data is not None
+            assert len(challenge.challenge_data) > 0
+            assert challenge.signature is None
             
-            # Verify database interactions
-            mock_session.add.assert_called_once()
-            mock_session.commit.assert_called()
-            mock_session.refresh.assert_called_once()
-            mock_session.close.assert_called()
+            # Verify it exists in database
+            challenge_in_db = db.session.query(Challenge).filter_by(user_id=user_id).first()
+            assert challenge_in_db is not None
+            assert challenge_in_db.challenge_data == challenge.challenge_data
 
 def query_side_effect_factory(mock_challenge_query, mock_user_query):
     """Factory to create a side effect for session.query."""
@@ -104,50 +87,48 @@ def test_verify_challenge():
             mock_session.delete.assert_called_once_with(mock_challenge)
             mock_session.commit.assert_called_once()
             mock_session.close.assert_called_once()
-            signature="test_signature"
-            
-            
 
-def test_create_and_verify_challenge():
-    """Test full challenge creation and verification flow."""
-    from datetime import datetime, timezone
-    # Prepare mock challenge and user
-    mock_challenge = MagicMock(user_id=1, challenge_data="test_challenge_data")
-    mock_challenge.created_at = datetime.now(timezone.utc)
+def test_create_and_verify_challenge(app, db_session):
+    """Test full challenge creation and verification flow with proper session management."""
+    from db.database import db
     from models.pgp_key import PgpKeyType
-    mock_pgp_key = MagicMock(key_type=PgpKeyType.PUBLIC, key_data='mock_public_key')
-    mock_user = MagicMock()
-    mock_user.pgp_keys.all.return_value = [mock_pgp_key]
-    mock_challenge.user = mock_user
+    from datetime import timezone
 
-    cs = ChallengeService()
-    # Mock creation
-    with patch('services.challenge_service.get_session') as mock_get_session:
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        # Prune returns nothing
-        mock_query = MagicMock()
-        mock_query.filter.return_value.filter.return_value.delete.return_value = None
-        mock_query.filter.return_value.order_by.return_value.all.return_value = []
-    # Mock verification
-    with patch('services.challenge_service.get_session') as mock_get_session:
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        # Query returns our mock challenge and user
-        mock_challenge_query = MagicMock()
-        mock_challenge_query.filter_by.return_value.first.return_value = mock_challenge
-        mock_user_query = MagicMock()
-        mock_user_query.filter_by.return_value.first.return_value = mock_user
-        mock_session.query.side_effect = query_side_effect_factory(mock_challenge_query, mock_user_query)
-        # Verify signature
-        with patch('utils.gpg_utils.verify_signature', return_value=True):
-            result, message = cs.verify_challenge(
-                user_id=1,
-                challenge_data="test_challenge_data",
-                signature="test_signature"
-            )
-            assert result is True
-            assert message == "Challenge verified"
-            mock_session.delete.assert_called_once_with(mock_challenge)
-            mock_session.commit.assert_called_once()
-            mock_session.close.assert_called_once()
+    with app.app_context():
+        # Create a test user with a public key
+        user = User(username='testuser', password_hash='hashed_password', api_key='test_api_key')
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+        
+        # Add a public key for the user
+        public_key = PgpKey(user_id=user_id, key_type=PgpKeyType.PUBLIC, key_data='mock_public_key_data')
+        db.session.add(public_key)
+        db.session.commit()
+        
+        # Mock get_session to use the same session throughout
+        with patch('services.challenge_service.get_session', return_value=db.session):
+            service = ChallengeService()
+            challenge = service.create_challenge(user_id=user_id)
+            
+            assert challenge.user_id == user_id
+            assert challenge.challenge_data is not None
+
+            # Ensure challenge.created_at is timezone-aware for the test
+            if challenge.created_at.tzinfo is None:
+                challenge.created_at = challenge.created_at.replace(tzinfo=timezone.utc)
+                db.session.commit()
+            
+            # Test the verification part using the service with mocked GPG operations
+            with patch('utils.gpg_utils.verify_signature', return_value=True):
+                result, message = service.verify_challenge(
+                    user_id=user_id,
+                    challenge_data=challenge.challenge_data,
+                    signature="test_signature"
+                )
+                assert result is True
+                assert message == "Challenge verified"
+            
+            # Verify that challenge was deleted after verification
+            remaining_challenges = db.session.query(Challenge).filter_by(user_id=user_id).all()
+            assert len(remaining_challenges) == 0

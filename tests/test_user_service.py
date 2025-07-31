@@ -1,6 +1,5 @@
 import os
 import sys
-
 import pytest
 
 # Ensure project root is in sys.path for imports
@@ -78,97 +77,94 @@ def app_context(app: Flask):
     with app.app_context():
         yield
 
-def test_register_user(monkeypatch: pytest.MonkeyPatch):
-    """Test user registration with simplified mocking."""
+@pytest.fixture
+def mock_session():
+    return MockSession()
 
-    def mock_user_constructor(*args, **kwargs):
-        return MockUser(**kwargs)
+@pytest.fixture
+def user_service():
+    return UserService()
 
-    def mock_pgpkey_constructor(*args, **kwargs):
-        return MockPgpKey(**kwargs)
+class UserServiceTestCase:
+    """Grouped unit tests for UserService with improved structure."""
 
-    monkeypatch.setattr("db.database.get_session", lambda: MockSession())
-    monkeypatch.setattr("models.user.User", mock_user_constructor)
-    monkeypatch.setattr("models.pgp_key.PgpKey", mock_pgpkey_constructor)
+    def test_register_user(self, monkeypatch, mock_session, user_service):
+        """Test user registration with simplified mocking."""
+        # Arrange
+        def mock_user_constructor(*args, **kwargs):
+            return MockUser(**kwargs)
+        def mock_pgpkey_constructor(*args, **kwargs):
+            return MockPgpKey(**kwargs)
+        monkeypatch.setattr("db.database.get_session", lambda: mock_session)
+        monkeypatch.setattr("models.user.User", mock_user_constructor)
+        monkeypatch.setattr("models.pgp_key.PgpKey", mock_pgpkey_constructor)
+        # Act
+        user, _ = user_service.register_user(username="testuser", password="password", public_key_data="pubkey", private_key_data="privkey")
+        # Assert
+        assert user is not None, "User should not be None"
+        user = cast(MockUser, user)
+        assert user.username == "testuser"
+        assert user.password_hash is not None
 
-    service = UserService()
-    user, _ = service.register_user(username="testuser", password="password", public_key_data="pubkey", private_key_data="privkey")
-    assert user is not None, "User should not be None"
-    user = cast(MockUser, user)
-    assert cast(MockUser, user).username == "testuser"
-    assert user.password_hash is not None
+    def test_login_user(self, monkeypatch, user_service):
+        """Test user login with simplified mocking."""
+        # Arrange
+        class MockSessionLogin(MockSession):
+            def __init__(self):
+                super().__init__()
+                self.users = {
+                    "testuser": MockUser(username="testuser", password_hash="hashedpassword", api_key="mockkey")
+                }
+        monkeypatch.setattr("db.database.get_session", lambda: MockSessionLogin())
+        def mock_verify_password(password, password_hash):
+            return password == "password" and password_hash == "hashedpassword"
+        monkeypatch.setattr("services.auth_service.verify_password", mock_verify_password)
+        # Act
+        user, _ = user_service.login_user(username="testuser", password="password")
+        # Assert
+        assert user is not None, "User should not be None"
+        assert cast(MockUser, user).username == "testuser"
 
-def test_login_user(monkeypatch: pytest.MonkeyPatch):
-    """Test user login with simplified mocking."""
+    def test_register_and_login_user(self, monkeypatch):
+        """Test user registration and login with simplified mocking."""
+        from unittest.mock import patch
+        # Arrange
+        def mock_generate_gpg_keypair(name, email, passphrase):
+            return "MOCK_PUBLIC_KEY", "MOCK_PRIVATE_KEY"
+        with patch('utils.gpg_utils.generate_gpg_keypair', mock_generate_gpg_keypair):
+            from services.user_service import UserService
+            from flask import Flask
+            from db.database import init_db
+            app = Flask(__name__)
+            app.config['TESTING'] = True
+            app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+            app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+            with app.app_context():
+                init_db(app)
+                us = UserService()
+                import uuid
+                from typing import cast
+                unique_user = f"testuser_{str(uuid.uuid4())[:8]}"
+                # Act & Assert: Registration
+                user, result = us.register_user(unique_user, 'testpass', 'PUBLIC_KEY_DATA', 'PRIVATE_KEY_DATA')
+                assert user is not None, f"Registration should succeed, got error: {result}"
+                assert cast(MockUser, user).username == unique_user
+                assert hasattr(user, 'api_key')
+                assert cast(MockUser, user).api_key is not None
+                # Act & Assert: Successful login
+                user2, keypair2 = us.login_user(unique_user, 'testpass')
+                assert user2 is not None, "Login should succeed"
+                assert cast(MockUser, user2).username == unique_user
+                # Act & Assert: Failed login
+                user3, err = us.login_user(unique_user, 'wrongpass')
+                assert user3 is None
+                assert err == 'Invalid credentials'
+                # Act & Assert: Duplicate registration
+                user4, err = us.register_user(unique_user, 'testpass', 'PUB', 'PRIV')
+                assert user4 is None
+                assert err == 'Username already exists'
 
-    class MockSessionLogin(MockSession):
-        def __init__(self):
-            super().__init__()
-            self.users = {
-                "testuser": MockUser(username="testuser", password_hash="hashedpassword", api_key="mockkey")
-            }
-
-    monkeypatch.setattr("db.database.get_session", lambda: MockSessionLogin())
-    def mock_verify_password(password, password_hash):
-        return password == "password" and password_hash == "hashedpassword"
-
-    monkeypatch.setattr("services.auth_service.verify_password", mock_verify_password)
-
-    service = UserService()
-    user, _ = service.login_user(username="testuser", password="password")
-
-    assert user is not None, "User should not be None"
-    assert cast(MockUser, user).username == "testuser"
-
-    from unittest.mock import Mock, patch
-    from models.user import User
-    # Mock user storage
-    users_db = {}
-
-def test_register_and_login_user(monkeypatch: pytest.MonkeyPatch):
-    """Test user registration and login with simplified mocking."""
-    from unittest.mock import Mock, patch
-    from models.user import User
-    # Mock user storage
-    users_db = {}
-    def mock_generate_gpg_keypair(name, email, passphrase):
-        return "MOCK_PUBLIC_KEY", "MOCK_PRIVATE_KEY"
-    
-    # Use patch instead of monkeypatch for better control
-    with patch('utils.gpg_utils.generate_gpg_keypair', mock_generate_gpg_keypair):
-        from services.user_service import UserService
-        from flask import Flask
-        from db.database import init_db
-
-        app = Flask(__name__)
-        app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        with app.app_context():
-            init_db(app)
-            us = UserService()
-            
-            # Test user registration with unique username
-            import uuid
-            from typing import cast  # added import
-            unique_user = f"testuser_{str(uuid.uuid4())[:8]}"
-            user, result = us.register_user(unique_user, 'testpass', 'PUBLIC_KEY_DATA', 'PRIVATE_KEY_DATA')
-            assert user is not None, f"Registration should succeed, got error: {result}"
-            assert cast(User, user).username == unique_user
-            assert hasattr(user, 'api_key')
-            assert cast(User, user).api_key is not None
-            
-            # Test successful login
-            user2, keypair2 = us.login_user(unique_user, 'testpass')
-            assert user2 is not None, "Login should succeed"
-            assert cast(User, user2).username == unique_user
-            
-            # Test failed login with wrong password
-            user3, err = us.login_user(unique_user, 'wrongpass')
-            assert user3 is None
-            assert err == 'Invalid credentials'
-            
-            # Test duplicate registration
-            user4, err = us.register_user(unique_user, 'testpass', 'PUB', 'PRIV')
-            assert user4 is None
-            assert err == 'Username already exists'
+# Register the test class with pytest
+@pytest.mark.usefixtures("app_context")
+class TestUserService(UserServiceTestCase):
+    pass

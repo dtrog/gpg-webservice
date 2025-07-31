@@ -17,9 +17,12 @@ class PgpKey(db.Model):
     __tablename__ = "pgp_keys"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', use_alter=True), nullable=False)
     key_type = db.Column(Enum(PgpKeyType, name="pgp_key_type", native_enum=False), nullable=False)
     key_data = db.Column(db.String, nullable=False)
+    
+    # Relationship back to user
+    user = db.relationship('User', back_populates='pgp_keys')
 
     @abstractmethod
     def key_role(self) -> str:

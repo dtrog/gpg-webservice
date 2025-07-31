@@ -74,13 +74,17 @@ def test_sign_invalid_api_key(client):
     os.unlink(fname)
 
 def test_encrypt_missing_fields(client):
-    api_key = client.post('/register', json={'username': 'bob', 'password': 'pw'}).get_json()['api_key']
+    reg_resp = client.post('/register', json={'username': 'bob', 'password': 'TestPass123!'})
+    assert reg_resp.status_code == 201, f"Registration failed: {reg_resp.get_json()}"
+    api_key = reg_resp.get_json()['api_key']
     rv = client.post('/encrypt', data={}, headers={'X-API-KEY': api_key})
     assert rv.status_code == 400
     assert 'error' in rv.get_json()
 
 def test_decrypt_missing_fields(client):
-    api_key = client.post('/register', json={'username': 'bob2', 'password': 'pw'}).get_json()['api_key']
+    reg_resp = client.post('/register', json={'username': 'bob2', 'password': 'TestPass123!'})
+    assert reg_resp.status_code == 201, f"Registration failed: {reg_resp.get_json()}"
+    api_key = reg_resp.get_json()['api_key']
     rv = client.post('/decrypt', data={}, headers={'X-API-KEY': api_key})
     assert rv.status_code == 400
     assert 'error' in rv.get_json()
@@ -106,7 +110,9 @@ def test_challenge_invalid_api_key(client):
     assert 'error' in rv.get_json()
 
 def test_verify_challenge_missing_fields(client):
-    api_key = client.post('/register', json={'username': 'eve', 'password': 'pw'}).get_json()['api_key']
+    reg_resp = client.post('/register', json={'username': 'eve', 'password': 'TestPass123!'})
+    assert reg_resp.status_code == 201, f"Registration failed: {reg_resp.get_json()}"
+    api_key = reg_resp.get_json()['api_key']
     rv = client.post('/verify_challenge', json={}, headers={'X-API-KEY': api_key})
     assert rv.status_code == 400
     assert 'error' in rv.get_json()

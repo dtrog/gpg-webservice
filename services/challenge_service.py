@@ -39,7 +39,10 @@ class ChallengeService:
         session = get_session()
         self.prune_old_challenges(session, user_id)
         challenge_data = secrets.token_urlsafe(32)
-        challenge = Challenge(user_id=user_id, challenge_data=challenge_data, signature=None)
+        challenge = Challenge()
+        challenge.challenge_data = challenge_data
+        challenge.signature = None
+        challenge.user_id = user_id
         session.add(challenge)
         session.commit()
         session.refresh(challenge)
@@ -58,9 +61,13 @@ class ChallengeService:
             session.close()
             return False, 'Challenge not found or expired'
         # Check if challenge is expired
-        if (datetime.now(timezone.utc) - challenge.created_at).total_seconds() > timedelta(days=self.MAX_AGE_DAYS).total_seconds():
-            session.delete(challenge)
-            session.commit()
+
+        # Ensure challenge.created_at is timezone-aware
+        created_at = challenge.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+
+        if (datetime.now(timezone.utc) - created_at).total_seconds() > timedelta(days=self.MAX_AGE_DAYS).total_seconds():
             session.close()
             return False, 'Challenge expired'
         if not signature:
@@ -73,7 +80,13 @@ class ChallengeService:
             session.close()
             return False, 'User not found'
         public_key_obj = None
-        for key in user.pgp_keys.all():
+        # Get iterable of PGP keys; handle both list-based and query-like interfaces
+        keys = user.pgp_keys
+        try:
+            iterable = keys.all()
+        except AttributeError:
+            iterable = keys
+        for key in iterable:
             if key.key_type == PgpKeyType.PUBLIC:
                 public_key_obj = key
                 break

@@ -44,39 +44,11 @@ class Challenge(db.Model):
     __tablename__ = 'challenges'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', use_alter=True), nullable=False)
     challenge_data = db.Column(db.String, nullable=False)
     signature = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
     user = db.relationship('User')
-
-    def __init__(
-        self, 
-        user_id: int, 
-        challenge_data: str, 
-        signature: Optional[str] = None, 
-        user: Optional['User'] = None, 
-        created_at: Optional[datetime] = None, 
-        **kwargs
-    ):
-        """
-        Initialize a new Challenge instance.
-        
-        Args:
-            user_id (int): ID of the user being challenged
-            challenge_data (str): Random challenge string to be signed
-            signature (str, optional): User's signature (set when challenge is completed)
-            user (User, optional): User instance (will be loaded from DB if not provided)
-            created_at (datetime, optional): Custom creation timestamp (defaults to now)
-            **kwargs: Additional keyword arguments passed to SQLAlchemy Model
-        """
-        super().__init__(**kwargs)
-        self.user_id = user_id
-        self.challenge_data = challenge_data
-        self.signature = signature
-        self.user = user
-        if created_at is not None:
-            self.created_at = created_at
 
     def __repr__(self) -> str:
         """Return a string representation of the Challenge instance."""

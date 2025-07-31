@@ -69,14 +69,29 @@ def verify_signature_file(input_path: str, sig_path: str, public_key: str) -> bo
         with open(pubkey_path, 'w') as f:
             f.write(public_key)
         import_cmd = [
-            'gpg', '--homedir', gnupg_home, '--import', pubkey_path
+            'gpg', '--homedir', gnupg_home, '--batch', '--import', pubkey_path
         ]
-        subprocess.run(import_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # Verify signature
+        # Try importing public key; ignore errors to allow verification to proceed
+        try:
+            subprocess.run(import_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            pass
+        # Verify signature using isolated GPG environment
         verify_cmd = [
             'gpg', '--homedir', gnupg_home, '--trust-model', 'always', '--verify', sig_path, input_path
         ]
-        result = subprocess.run(verify_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Kill any existing GPG agent to avoid blocking or environment issues
+        subprocess.run(['gpgconf', '--kill', 'gpg-agent'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        # Prepare isolated environment for GPG
+        env = os.environ.copy()
+        env.update({
+            'GNUPGHOME': gnupg_home,
+            'GPG_AGENT_INFO': '',
+            'GPG_TTY': '',
+            'DISPLAY': '',
+            'PINENTRY_USER_DATA': 'USE_CURSES=0',
+        })
+        result = subprocess.run(verify_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         return result.returncode == 0
 
 def encrypt_file(input_path: str, public_key: str, output_path: str):

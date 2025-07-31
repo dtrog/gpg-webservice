@@ -5,11 +5,14 @@ This module tests all OpenAI-compatible endpoints to ensure they work correctly
 with the expected input/output formats for function calling.
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 import json
 import base64
 import tempfile
-import os
 from unittest.mock import patch, MagicMock
 
 from app import app
@@ -19,16 +22,6 @@ from models.pgp_key import PgpKey, PgpKeyType
 from services.user_service import UserService
 
 
-@pytest.fixture
-def client():
-    """Create a test client with in-memory database."""
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    
-    with app.app_context():
-        db.create_all()
-        yield app.test_client()
-        db.drop_all()
 
 
 def register_test_user(client, username='testuser', password='TestPass123!', email='test@example.com'):
@@ -72,6 +65,10 @@ class TestOpenAIRoutes:
         """Test successful user registration via OpenAI endpoint."""
         response = register_test_user(client)
         
+        if response.status_code != 201:
+            print(f"Status: {response.status_code}")
+            print(f"Response: {response.get_json()}")
+        
         assert response.status_code == 201
         data = response.get_json()
         
@@ -109,7 +106,7 @@ class TestOpenAIRoutes:
         data = response.get_json()
         
         assert data['success'] is False
-        assert data['error_code'] == 'REGISTRATION_FAILED'
+        assert data['error_code'] == 'INVALID_PASSWORD'
     
     def test_sign_text_function_success(self, client):
         """Test successful text signing via OpenAI endpoint."""
@@ -197,28 +194,33 @@ class TestOpenAIRoutes:
     
     def test_verify_text_signature_function_success(self, client):
         """Test successful signature verification via OpenAI endpoint."""
-        # Register user and sign text
-        reg_response = register_test_user(client)
-        api_key = reg_response.get_json()['data']['api_key']
-        public_key = reg_response.get_json()['data']['public_key']
-        
-        # Sign text
-        sign_response = client.post('/openai/sign_text',
-                                   json={'text': 'Test message for verification'},
-                                   headers={'X-API-KEY': api_key},
-                                   content_type='application/json')
-        
-        signature = sign_response.get_json()['data']['signature']
-        
-        # Verify signature
-        response = client.post('/openai/verify_text_signature',
-                              json={
-                                  'text': 'Test message for verification',
-                                  'signature': signature,
-                                  'public_key': public_key
-                              },
-                              headers={'X-API-KEY': api_key},
-                              content_type='application/json')
+        try:
+            # Register user and sign text
+            reg_response = register_test_user(client)
+            
+            api_key = reg_response.get_json()['data']['api_key']
+            public_key = reg_response.get_json()['data']['public_key']
+            
+            # Sign text
+            sign_response = client.post('/openai/sign_text',
+                                       json={'text': 'Test message for verification'},
+                                       headers={'X-API-KEY': api_key},
+                                       content_type='application/json')
+            
+            signature = sign_response.get_json()['data']['signature']
+            
+            # Verify signature
+            response = client.post('/openai/verify_text_signature',
+                                  json={
+                                      'text': 'Test message for verification',
+                                      'signature': signature,
+                                      'public_key': public_key
+                                  },
+                                  headers={'X-API-KEY': api_key},
+                                  content_type='application/json')
+            
+        except Exception as e:
+            raise
         
         assert response.status_code == 200
         data = response.get_json()

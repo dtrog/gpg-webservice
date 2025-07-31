@@ -20,21 +20,15 @@ class User(db.Model):
     username = db.Column(db.String, unique=True, nullable=False)
     password_hash = db.Column(db.String, nullable=False)
     api_key = db.Column(db.String, unique=True, nullable=False)
-    public_pgp_key_id = db.Column(db.Integer, db.ForeignKey('pgp_keys.id'), unique=True)
-    private_pgp_key_id = db.Column(db.Integer, db.ForeignKey('pgp_keys.id'), unique=True)
+    # Relationships to PGP keys
+    pgp_keys = relationship('PgpKey', back_populates='user', cascade='all, delete-orphan')
 
-    public_pgp_key = relationship('PublicPgpKey', foreign_keys=[public_pgp_key_id], uselist=False, post_update=True)
-    private_pgp_key = relationship('PrivatePgpKey', foreign_keys=[private_pgp_key_id], uselist=False, post_update=True)
-
-    def __init__(self, username: str, password_hash: str, api_key: str, public_pgp_key: PublicPgpKey = None, private_pgp_key: PrivatePgpKey = None, **kwargs):
+    def __init__(self, username: str, password_hash: str, api_key: str, **kwargs):
         super().__init__(**kwargs)
         self.username = username
         self.password_hash = password_hash
         self.api_key = api_key
-        if public_pgp_key is not None:
-            self.public_pgp_key = public_pgp_key
-        if private_pgp_key is not None:
-            self.private_pgp_key = private_pgp_key
+        self.pgp_keys = []
 
     def __repr__(self) -> str:
         api_key_display = f"{self.api_key[:8]}..." if self.api_key else "None"
