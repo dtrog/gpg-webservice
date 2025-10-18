@@ -50,7 +50,6 @@ gpg_users.db
 # Secrets
 .env
 .env.*
-.render.yaml
 
 # Build
 build/
