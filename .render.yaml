@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: gpg-webservice
+    runtime: docker
+    region: frankfurt
+    plan: free
+    envVars:
+      - key: OPENAI_API_KEY
+        value: YOUR_SECRET_KEY  # Set this manually in the Render dashboard, not from .env
+    autoDeploy: true
