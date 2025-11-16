@@ -1,0 +1,20 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "GPG Webservice (partial)",
+    "version": "0.1.0",
+    "description": "A minimal OpenAPI description for the GPG Webservice — add more paths as needed."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/openai/function_definitions": {
+      "get": {
+        "summary": "Get OpenAI function definitions",
+        "responses": { "200": { "description": "Function definitions" } }
+      }
+    },
+    "/openai/register_user": {
+      "post": { "summary": "Register user (OpenAI-compatible)", "responses": { "200": { "description": "Registered" } } }
+    }
+  }
+}

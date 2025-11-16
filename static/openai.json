@@ -1,0 +1,116 @@
+{
+  "success": true,
+  "data": {
+    "functions": [
+      {
+        "name": "register_user",
+        "description": "Register a new user account with automatic GPG key generation",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "description": "Username (3-50 chars, alphanumeric + underscore/hyphen)",
+              "minLength": 3,
+              "maxLength": 50
+            },
+            "password": {
+              "type": "string",
+              "description": "Strong password (8+ chars, uppercase, lowercase, digit, special char)",
+              "minLength": 8
+            },
+            "email": {
+              "type": "string",
+              "description": "Valid email address",
+              "format": "email"
+            }
+          },
+          "required": ["username", "password", "email"]
+        }
+      },
+      {
+        "name": "sign_text",
+        "description": "Sign text content using the user's private GPG key",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Text content to sign"
+            }
+          },
+          "required": ["text"]
+        }
+      },
+      {
+        "name": "verify_text_signature",
+        "description": "Verify a text signature against a public key",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Original text content that was signed"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Base64-encoded signature"
+            },
+            "public_key": {
+              "type": "string",
+              "description": "ASCII-armored public key for verification"
+            }
+          },
+          "required": ["text", "signature", "public_key"]
+        }
+      },
+      {
+        "name": "encrypt_text",
+        "description": "Encrypt text content for a recipient using their public key",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Text content to encrypt"
+            },
+            "recipient_public_key": {
+              "type": "string",
+              "description": "ASCII-armored public key of the recipient"
+            }
+          },
+          "required": ["text", "recipient_public_key"]
+        }
+      },
+      {
+        "name": "decrypt_text",
+        "description": "Decrypt text content using the user's private key",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "encrypted_text": {
+              "type": "string",
+              "description": "Base64-encoded encrypted content"
+            }
+          },
+          "required": ["encrypted_text"]
+        }
+      },
+      {
+        "name": "get_user_public_key",
+        "description": "Get the authenticated user's public GPG key",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      }
+    ],
+    "base_url": "http://localhost:5000/openai/",
+    "authentication": "API key required via X-API-KEY header",
+    "rate_limits": {
+      "api_endpoints": "30 requests per minute per IP"
+    }
+  },
+  "message": "Function definitions retrieved successfully"
+}
