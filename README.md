@@ -5,6 +5,7 @@ A secure Flask-based webservice providing GPG cryptographic operations through H
 ## 🔐 Security Features
 
 ### Core Security
+
 - **Secure Key Generation**: RSA 3072-bit keypairs automatically generated per user
 - **Enhanced Passphrase Derivation**: PBKDF2-HMAC-SHA256 with 100,000 iterations and user-specific salts
 - **Password Security**: Argon2id + AES-GCM for password hashing and key encryption
@@ -13,6 +14,7 @@ A secure Flask-based webservice providing GPG cryptographic operations through H
 - **No Plaintext Storage**: Private keys encrypted with password-derived keys
 
 ### Network & Application Security
+
 - **Rate Limiting**: Configurable rate limits for authentication (5/min) and API endpoints (30/min)
 - **Input Validation**: Comprehensive validation for usernames, passwords, emails, and file uploads
 - **File Upload Security**: Size limits, extension validation, and secure filename handling
@@ -20,6 +22,7 @@ A secure Flask-based webservice providing GPG cryptographic operations through H
 - **Docker Isolation**: Complete GPG agent isolation prevents host system interference
 
 ### Authentication & Authorization
+
 - **API Key Authentication**: Secure token-based authentication for all operations
 - **Reserved Username Protection**: Prevents registration of system usernames
 - **Email Validation**: RFC-compliant email address validation

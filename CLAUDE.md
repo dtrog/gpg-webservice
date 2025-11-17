@@ -19,10 +19,13 @@ This is a Flask-based GPG webservice that provides cryptographic operations (sig
 
 ### Security Model
 
-- Users authenticate with API keys (SHA256 hashed and used as GPG passphrases)
-- Private keys are encrypted with Argon2id + AES-GCM using password-derived keys
+- Users authenticate with API keys (SHA256 hashed before database storage)
+- Passwords are hashed with Argon2id (OWASP recommended)
+- API keys are only returned once at registration (never at login)
+- GPG passphrases derived from raw API keys using PBKDF2 with user ID as salt
 - All GPG operations use temporary, isolated keyrings for security
 - RSA 3072-bit keypairs are automatically generated on user registration
+- Comprehensive audit logging for all security events
 
 ## Common Development Commands
 
@@ -51,9 +54,9 @@ docker-compose run --rm test-runner pytest tests/test_app.py::test_register -v
 docker-compose up gpg-webservice
 
 # Initialize database locally
-python -c "from app import init_db; init_db()"
+python init_database.py
 
-# Start local Flask server
+# Start local Flask server (automatically initializes DB if needed)
 python app.py
 
 # Install dependencies
@@ -70,7 +73,7 @@ rm -f gpg_users.db instance/gpg_users.db
 sqlite3 gpg_users.db ".schema"
 
 # Inspect data
-sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
+sqlite3 gpg_users.db "SELECT id, username, api_key_hash FROM users;"
 ```
 
 ## Key Implementation Details
@@ -79,20 +82,22 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 
 - All GPG operations must use temporary directories (`tempfile.mkdtemp()`) for isolation
 - GPG agent is disabled via environment variables (`GPG_AGENT_INFO=""`, `DISPLAY=""`)
-- Private key passphrases are derived from API keys: `hashlib.sha256(api_key.encode()).hexdigest()`
+- Private key passphrases are derived from raw API keys: `derive_gpg_passphrase(raw_api_key, user.id)`
 - Public keys are stored as ASCII-armored text in the database
 - Private keys are encrypted before database storage using `crypto_utils.encrypt_private_key()`
 
 ### Authentication Flow
 
-1. User registration generates API key and RSA keypair
-2. Private key is encrypted with password-derived key before storage
-3. API key serves dual purpose: authentication token and GPG passphrase base
-4. All protected endpoints require `X-API-KEY` header validation
+1. User registration generates raw API key (returned once) and RSA keypair
+2. API key is hashed with SHA256 before database storage
+3. Password is hashed with Argon2id before database storage
+4. Private key is encrypted with GPG passphrase derived from raw API key
+5. All protected endpoints require `X-API-KEY` header validation
+6. Raw API key is passed to endpoints for GPG passphrase derivation
 
 ### Database Models
 
-- `User`: username, password_hash, api_key
+- `User`: username, password_hash, api_key_hash (SHA256 of API key)
 - `PgpKey`: user_id, key_type ('public'/'private'), key_data (ASCII-armored)
 - `Challenge`: user_id, challenge_data, signature, created_at
 
