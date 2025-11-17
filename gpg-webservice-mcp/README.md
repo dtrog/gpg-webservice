@@ -5,10 +5,12 @@ A Model Context Protocol (MCP) server that adapts the Flask GPG webservice for u
 ## Features
 
 - **Dynamic Function Loading**: Automatically fetches and registers all GPG operations from the Flask webservice
-- **Seamless Integration**: Works with ChatGPT, Claude Desktop, and other MCP clients
+- **Seamless Integration**: Works with OpenAI Agent SDK, Claude Desktop, ChatGPT, and other MCP clients
+- **Dual Transport Support**: stdio for local clients, HTTP for network/agent integrations
 - **Complete GPG Operations**: Supports signing, verification, encryption, decryption, and key management
 - **Flexible Authentication**: Supports API keys via environment variables or per-request
 - **Zero Code Changes**: Works with existing Flask GPG webservice without modifications
+- **Production Ready**: Supports deployment behind HTTPS proxies for secure remote access
 
 ## Available Operations
 
@@ -64,6 +66,8 @@ The MCP server dynamically exposes these tools from the Flask webservice:
 |----------|----------|---------|-------------|
 | `GPG_API_BASE` | Yes | `http://localhost:5000` | Base URL of the Flask GPG webservice |
 | `GPG_API_KEY` | No | - | Default API key for authenticated operations |
+| `MCP_PORT` | No (HTTP only) | `3000` | Port for HTTP transport server |
+| `MCP_HOST` | No (HTTP only) | `0.0.0.0` | Host address for HTTP transport (use `0.0.0.0` for external access) |
 
 ### Getting an API Key
 
@@ -89,18 +93,37 @@ To use authenticated operations (signing, encryption, etc.), you need an API key
 
 ## Running the Server
 
-### Development Mode
+The MCP adapter supports two transport modes:
 
+### 1. stdio Transport (Default - for Claude Desktop, etc.)
+
+**Development Mode:**
 ```bash
 npm run dev
 ```
 
-### Production Mode
-
+**Production Mode:**
 ```bash
 npm run build
 npm start
 ```
+
+### 2. HTTP Transport (for ChatGPT, web-based clients)
+
+**Development Mode:**
+```bash
+npm run dev:http
+```
+
+**Production Mode:**
+```bash
+npm run build
+npm run start:http
+```
+
+The HTTP server will start on `http://0.0.0.0:3000` by default with these endpoints:
+- `/mcp` - Main MCP endpoint for ChatGPT connections
+- `/health` - Health check endpoint
 
 ### Using with Watch Mode (for development)
 
@@ -110,7 +133,11 @@ npm run watch
 
 In another terminal:
 ```bash
+# For stdio transport
 npm start
+
+# For HTTP transport
+npm run start:http
 ```
 
 ## Deployment
@@ -176,6 +203,43 @@ For production deployments, ensure:
 
 ## Using with MCP Clients
 
+### OpenAI Agent SDK
+
+For detailed integration with OpenAI's Agent SDK (Python), see [OPENAI_AGENT_SDK.md](./OPENAI_AGENT_SDK.md).
+
+**Quick Start:**
+```bash
+# 1. Install Python SDK
+pip install openai-agents-sdk
+
+# 2. Start MCP HTTP server
+npm run start:http
+
+# 3. Run the example
+export OPENAI_API_KEY=your-key
+python examples/openai_agent_example.py
+```
+
+**Quick Example:**
+```python
+from openai_agents_sdk import Agent
+from openai_agents_sdk.mcp import MCPServerStreamableHttp
+
+async with MCPServerStreamableHttp(
+    name="GPG Webservice",
+    params={"url": "http://localhost:3000/mcp", "timeout": 30},
+) as mcp_server:
+    agent = Agent(
+        name="GPG Assistant",
+        model="gpt-4o",
+        instructions="You help users with GPG cryptographic operations.",
+        mcp_servers=[mcp_server],
+    )
+    result = await agent.run("Register user alice with password SecurePass123!")
+```
+
+See [examples/](./examples/) directory for complete working examples.
+
 ### Claude Desktop
 
 Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
@@ -197,9 +261,50 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 Restart Claude Desktop, and the GPG tools will be available.
 
-### ChatGPT Desktop (when MCP support is available)
+### ChatGPT and Web-Based Clients
 
-Configuration will be similar - check ChatGPT's MCP documentation when available.
+For ChatGPT and other web-based clients, use the HTTP transport:
+
+1. **Start the HTTP server**:
+   ```bash
+   npm run build
+   npm run start:http
+   ```
+
+2. **Server will be available at**:
+   ```
+   http://localhost:3000/mcp
+   ```
+
+3. **For external access** (deploy to a server):
+   - Set `MCP_HOST=0.0.0.0` in `.env`
+   - Deploy behind HTTPS reverse proxy (nginx, Caddy, etc.)
+   - Configure ChatGPT to connect to `https://your-domain.com/mcp`
+
+4. **Health check**:
+   ```bash
+   curl http://localhost:3000/health
+   ```
+
+**Example nginx configuration for HTTPS**:
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location /mcp {
+        proxy_pass http://localhost:3000/mcp;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
 
 ### Custom MCP Client
 
@@ -239,16 +344,38 @@ const result = await client.callTool({
 
 ## Architecture
 
+### stdio Transport (Local Clients)
 ```
 ┌─────────────────┐
 │  MCP Client     │
-│ (ChatGPT/Claude)│
+│ (Claude Desktop)│
 └────────┬────────┘
          │ MCP Protocol (stdio)
          ↓
 ┌─────────────────┐
 │  MCP Adapter    │
-│  (This Server)  │
+│  (index.ts)     │
+└────────┬────────┘
+         │ HTTP/JSON
+         ↓
+┌─────────────────┐
+│ Flask GPG       │
+│ Webservice      │
+└─────────────────┘
+```
+
+### HTTP Transport (Network Clients)
+```
+┌─────────────────┐
+│  OpenAI Agent   │
+│  SDK / ChatGPT  │
+└────────┬────────┘
+         │ MCP Protocol (HTTP/SSE)
+         ↓
+┌─────────────────┐
+│  MCP HTTP       │
+│  Server         │
+│  (http-server.ts)│
 └────────┬────────┘
          │ HTTP/JSON
          ↓
@@ -260,28 +387,56 @@ const result = await client.callTool({
 
 ### Transport Layer: stdio vs HTTP
 
-**Current Implementation**: This MCP server uses **stdio transport** (standard input/output), which is the recommended approach for MCP servers. The server communicates with MCP clients through stdin/stdout, while making HTTP requests to the Flask backend.
+This MCP server supports **two transport modes**:
 
-**Why stdio?**
+#### 1. stdio Transport (Default)
+
+**Use Case**: Local clients like Claude Desktop, VS Code, Cursor
+
+**How to run**: `npm start` or `npm run dev`
+
+**Advantages**:
 - Standard MCP pattern - clients like Claude Desktop expect stdio
 - Secure - no network exposure of the MCP server itself
 - Simple - no need for port management or HTTPS certificates
 - Efficient - direct process communication
 
-**HTTP Transport (Alternative)**:
-If you need the MCP server to be network-accessible (e.g., for web-based ChatGPT connections), you would need to:
-1. Use `SSEServerTransport` or a custom HTTP transport
-2. Add authentication/authorization middleware
-3. Handle CORS and security considerations
-4. Deploy behind a reverse proxy with HTTPS
-
-The current stdio implementation is suitable for:
+**Best for**:
 - Claude Desktop integration
 - Local AI assistants
 - Command-line MCP clients
 - Any client that can spawn child processes
 
-For network-based ChatGPT connectors, you may need to wrap this server with an HTTP bridge or use a different transport mechanism.
+#### 2. HTTP Transport (Network-Accessible)
+
+**Use Case**: Network-based clients like ChatGPT, web applications, remote connections
+
+**How to run**: `npm run start:http` or `npm run dev:http`
+
+**Implementation**: Uses StreamableHTTPServerTransport from the MCP SDK
+
+**Endpoints**:
+- `POST /mcp` - Main MCP protocol endpoint
+- `GET /health` - Health check endpoint
+
+**Configuration**:
+```env
+MCP_PORT=3000        # Port to listen on
+MCP_HOST=0.0.0.0     # Host address (0.0.0.0 for external access)
+```
+
+**Best for**:
+- ChatGPT integrations
+- Web-based MCP clients
+- Remote access scenarios
+- Microservices architectures
+
+**Security Considerations for HTTP Mode**:
+- Deploy behind a reverse proxy with HTTPS in production
+- Implement authentication/authorization if needed
+- Configure CORS appropriately for your use case
+- Use environment-based secrets management
+- Consider rate limiting at the proxy level
 
 ### How It Works
 
@@ -312,12 +467,19 @@ All errors include error codes and human-readable messages.
 ```
 gpg-webservice-mcp/
 ├── src/
-│   ├── index.ts        # Main MCP server implementation
+│   ├── index.ts        # stdio transport MCP server
+│   ├── http-server.ts  # HTTP transport MCP server
 │   └── types.ts        # TypeScript type definitions
+├── examples/           # Example integrations
+│   ├── openai_agent_example.py  # OpenAI Agent SDK example
+│   ├── requirements.txt         # Python dependencies
+│   └── README.md               # Examples documentation
+├── dist/               # Compiled JavaScript output
 ├── package.json        # Dependencies and scripts
 ├── tsconfig.json       # TypeScript configuration
 ├── .env.example        # Environment variable template
-└── README.md          # This file
+├── README.md          # This file
+└── OPENAI_AGENT_SDK.md # OpenAI Agent SDK integration guide
 ```
 
 ### Adding Features
