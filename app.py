@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from werkzeug.utils import secure_filename
+from config import get_config
 from db.database import db, init_db
 from models.user import User
 from models.pgp_key import PgpKey
@@ -14,13 +15,23 @@ from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
 from routes.openai_routes import openai_bp, get_function_definitions
 from utils.security_utils import add_security_headers
+from utils.audit_logger import audit_logger
 
+# Load configuration
 app = Flask(__name__)
-UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/gpg_uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///gpg_users.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+config_class = get_config()
+app.config.from_object(config_class)
+
+# Initialize database
 init_db(app)
+
+# Log application startup
+import logging
+logging.basicConfig(
+    level=getattr(logging, config_class.LOG_LEVEL, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logging.info(f"GPG Webservice starting (env: {os.environ.get('FLASK_ENV', 'development')})")
 
 # Register blueprints
 app.register_blueprint(user_bp)

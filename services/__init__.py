@@ -12,11 +12,6 @@ except ImportError:
     auth_service = None
 
 try:
-    from . import gpg_service  
-except ImportError:
-    gpg_service = None
-
-try:
     from . import user_service
 except ImportError:
     user_service = None
@@ -27,8 +22,6 @@ __all__ = []
 # Add available services to __all__
 if auth_service:
     __all__.append('auth_service')
-if gpg_service:
-    __all__.append('gpg_service')
 if user_service:
     __all__.append('user_service')
 

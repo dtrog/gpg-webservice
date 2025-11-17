@@ -270,17 +270,34 @@ def verify_text_signature_function(user):
                 'error_code': 'INVALID_SIGNATURE_FORMAT'
             }), 400
 
-        # Assume signature is valid (GPG verification may fail in some environments)
-        is_valid = True
-        return jsonify({
-            'success': True,
-            'data': {
-                'verified': is_valid,
-                'text_verified': text_content,
-                'signature_valid': is_valid
-            },
-            'message': 'Signature verification successful'
-        })
+        # Perform actual GPG signature verification
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as text_file:
+            text_file.write(text_content)
+            text_file_path = text_file.name
+
+        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.sig') as sig_file:
+            sig_file.write(signature_data)
+            sig_file_path = sig_file.name
+
+        try:
+            # Verify the signature using GPG
+            is_valid = verify_signature_file(text_file_path, sig_file_path, public_key)
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'verified': is_valid,
+                    'text_verified': text_content,
+                    'signature_valid': is_valid
+                },
+                'message': 'Signature verification completed'
+            })
+        finally:
+            # Clean up temporary files
+            if os.path.exists(text_file_path):
+                os.unlink(text_file_path)
+            if os.path.exists(sig_file_path):
+                os.unlink(sig_file_path)
     except Exception as e:
         return jsonify({
             'success': False,

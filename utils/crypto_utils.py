@@ -129,12 +129,30 @@ def derive_gpg_passphrase(api_key: str, user_id: int) -> str:
 def generate_api_key() -> str:
     """
     Generate a secure, random API key.
-    
+
     Creates a cryptographically secure random API key using 32 random bytes
     encoded as base64url (URL-safe base64 without padding). This provides
     approximately 256 bits of entropy.
-    
+
     Returns:
         str: A base64url-encoded API key string (approximately 43 characters)
     """
     return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip('=')
+
+
+def hash_api_key(api_key: str) -> str:
+    """
+    Hash an API key for secure storage.
+
+    Uses SHA256 to create a one-way hash of the API key for database storage.
+    This prevents API key exposure if the database is compromised while still
+    allowing authentication by hashing the provided key and comparing.
+
+    Args:
+        api_key (str): The plaintext API key to hash
+
+    Returns:
+        str: The SHA256 hash of the API key as a hexadecimal string
+    """
+    import hashlib
+    return hashlib.sha256(api_key.encode()).hexdigest()

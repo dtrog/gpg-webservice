@@ -7,6 +7,7 @@ user_bp = Blueprint('user', __name__)
 from flask import request, jsonify
 from utils.security_utils import rate_limit_auth, validate_username, validate_password, validate_email
 from services.user_service import UserService
+from utils.audit_logger import audit_logger, AuditEventType
 
 @user_bp.route('/register', methods=['POST'])
 @rate_limit_auth
@@ -36,20 +37,35 @@ def register():
         if not valid:
             return jsonify({'error': error}), 400
     public_key_data = data.get('public_key')  # Optional
-    private_key_data = data.get('private_key')  # Optional  
+    private_key_data = data.get('private_key')  # Optional
     user_service = UserService()
-    user, pgp_keypair_or_error = user_service.register_user(username, password, public_key_data, private_key_data)
-    if not user:
-        return jsonify({'error': pgp_keypair_or_error}), 400
+    registration_result, error = user_service.register_user(username, password, public_key_data, private_key_data)
+    if error:
+        # Log registration failure
+        audit_logger.log_event(
+            AuditEventType.REGISTRATION,
+            status='failure',
+            username=username,
+            message=f'Registration failed for {username}: {error}'
+        )
+        return jsonify({'error': error}), 400
+
+    # Log successful registration
+    audit_logger.log_registration(
+        user_id=registration_result.user.id,
+        username=username,
+        email=email
+    )
+
     # Safely determine the public key to return
     public_key = public_key_data
-    if not isinstance(pgp_keypair_or_error, str) and hasattr(pgp_keypair_or_error, 'public_key') and pgp_keypair_or_error.public_key is not None:
-        public_key = pgp_keypair_or_error.public_key.key_data
-        
+    if registration_result.pgp_keypair.public_key:
+        public_key = registration_result.pgp_keypair.public_key.key_data
+
     return jsonify({
-        'message': 'User registered', 
-        'user_id': getattr(user, 'id', None), 
-        'api_key': getattr(user, 'api_key', None),
+        'message': 'User registered',
+        'user_id': registration_result.user.id,
+        'api_key': registration_result.api_key,  # Raw API key - only returned once!
         'public_key': public_key
     }), 201
 
@@ -69,9 +85,25 @@ def login():
     user_service = UserService()
     user, pgp_keypair_or_error = user_service.login_user(username, password)
     if not user:
+        # Log login failure
+        audit_logger.log_event(
+            AuditEventType.LOGIN_FAILURE,
+            status='failure',
+            username=username,
+            message=f'Login failed for {username}'
+        )
         return jsonify({'error': pgp_keypair_or_error}), 401
+
+    # Log successful login
+    audit_logger.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=user.id,
+        username=username,
+        message=f'User {username} logged in successfully'
+    )
+
     return jsonify({
-        'message': 'Login successful', 
-        'user_id': getattr(user, 'id', None),
-        'api_key': getattr(user, 'api_key', None)
+        'message': 'Login successful',
+        'user_id': user.id
+        # Note: API key is NOT returned on login (only at registration)
     }), 200

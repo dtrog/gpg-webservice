@@ -12,6 +12,7 @@ from utils.crypto_utils import decrypt_private_key, derive_gpg_passphrase
 from utils.security_utils import rate_limit_api, validate_file_upload, secure_temp_directory
 from services.auth_service import get_user_by_api_key
 from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file, decrypt_file_with_passphrase
+from utils.audit_logger import audit_logger, AuditEventType
 
 # GPG-related routes
 gpg_bp = Blueprint('gpg', __name__)
@@ -27,29 +28,50 @@ def api_key_to_gpg_passphrase(api_key: str) -> str:
 def require_api_key(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        api_key = request.headers.get('X-API-KEY')
-        if not api_key:
+        raw_api_key = request.headers.get('X-API-KEY')
+        if not raw_api_key:
+            audit_logger.log_event(
+                AuditEventType.INVALID_API_KEY,
+                status='failure',
+                message='API key missing from request'
+            )
             return jsonify({'error': 'API key required'}), 401
-        user = get_user_by_api_key(api_key)
+
+        user = get_user_by_api_key(raw_api_key)
         if not user:
+            audit_logger.log_event(
+                AuditEventType.INVALID_API_KEY,
+                status='failure',
+                message='Invalid API key attempted'
+            )
             return jsonify({'error': 'Invalid or inactive API key'}), 403
-        return f(user, *args, **kwargs)
+
+        # Log successful authentication
+        audit_logger.log_auth_success(
+            user_id=user.id,
+            username=user.username,
+            method='api_key'
+        )
+
+        # Pass both user and raw API key to the decorated function
+        # The raw API key is needed for GPG passphrase derivation
+        return f(user, raw_api_key, *args, **kwargs)
     return decorated
 
 # --- SIGN ---
 @gpg_bp.route('/sign', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def sign(user):
+def sign(user, raw_api_key):
     if 'file' not in request.files:
         return jsonify({'error': 'file required'}), 400
     file = request.files['file']
-    
+
     # Validate file upload
     valid, error = validate_file_upload(file, max_size_mb=5)
     if not valid:
         return jsonify({'error': error}), 400
-    
+
     filename = secure_filename(file.filename or 'file')
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, filename)
@@ -60,10 +82,28 @@ def sign(user):
             return jsonify({'error': 'Private key not found'}), 404
         sig_path = os.path.join(tmpdir, filename + '.sig')
         try:
-            # Use secure passphrase derivation with user ID as salt
-            gpg_passphrase = derive_gpg_passphrase(user.api_key, user.id)
+            # Use secure passphrase derivation with user ID as salt and RAW API key
+            gpg_passphrase = derive_gpg_passphrase(raw_api_key, user.id)
             sign_file(input_path, privkey.key_data, sig_path, gpg_passphrase)
+
+            # Log successful GPG sign operation
+            audit_logger.log_gpg_operation(
+                'sign',
+                user_id=user.id,
+                username=user.username,
+                filename=filename,
+                file_size=os.path.getsize(input_path)
+            )
+
         except Exception as e:
+            # Log GPG operation failure
+            audit_logger.log_error(
+                'gpg',
+                message=f'GPG sign failed for user {user.username}',
+                user_id=user.id,
+                username=user.username,
+                error=str(e)
+            )
             return jsonify({'error': f'Signing failed: {str(e)}'}), 500
         return send_file(sig_path, as_attachment=True)
 
@@ -76,39 +116,46 @@ def verify(user):
         return jsonify({'error': 'file and pubkey required'}), 400
     sig_file = request.files['file']  # This is the signature file
     pubkey_file = request.files['pubkey']  # This is the public key file
-    
+    original_file = request.files.get('original')  # Optional: original file for detached signatures
+
     # Validate file uploads
-    for file_obj, name in [(sig_file, 'signature file'), (pubkey_file, 'public key file')]:
+    files_to_validate = [(sig_file, 'signature file'), (pubkey_file, 'public key file')]
+    if original_file:
+        files_to_validate.append((original_file, 'original file'))
+
+    for file_obj, name in files_to_validate:
         valid, error = validate_file_upload(file_obj, max_size_mb=1)
         if not valid:
             return jsonify({'error': f'{name}: {error}'}), 400
-    
+
     sig_filename = secure_filename(sig_file.filename or 'file.sig')
     pubkey_filename = secure_filename(pubkey_file.filename or 'pubkey')
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         sig_path = os.path.join(tmpdir, sig_filename)
         pubkey_path = os.path.join(tmpdir, pubkey_filename)
         sig_file.save(sig_path)
         pubkey_file.save(pubkey_path)
-        
+
         # Read public key from file
         with open(pubkey_path, 'r') as f:
             pubkey_data = f.read()
-        
+
         try:
             # Check if this is a detached signature by reading the file content
             with open(sig_path, 'rb') as f:
                 sig_data = f.read()
-            
+
             # If it's binary data (detached signature), we need the original file
             if sig_data.startswith(b'\x89') or sig_filename.endswith('.sig'):
-                # This is a detached signature - we need to reconstruct the original file
-                # For the test, we know the original content
-                original_path = os.path.join(tmpdir, 'original.txt')
-                with open(original_path, 'w') as f:
-                    f.write('goodbye world')  # This matches the test content
-                
+                # This is a detached signature - we need the original file
+                if not original_file:
+                    return jsonify({'error': 'Detached signature requires original file (use "original" field)'}), 400
+
+                original_filename = secure_filename(original_file.filename or 'original')
+                original_path = os.path.join(tmpdir, original_filename)
+                original_file.save(original_path)
+
                 verified = verify_signature_file(original_path, sig_path, pubkey_data)
             else:
                 # This is a signed file, verify directly using GPG
@@ -124,7 +171,7 @@ def verify(user):
                     verify_cmd = ['gpg', '--homedir', gnupg_home, '--trust-model', 'always', '--verify', sig_path]
                     result = subprocess.run(verify_cmd, capture_output=True)
                     verified = result.returncode == 0
-                    
+
         except Exception as e:
             return jsonify({'error': f'Verification failed: {str(e)}'}), 500
         return jsonify({'verified': verified}), 200

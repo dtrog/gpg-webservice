@@ -9,6 +9,7 @@ This is a Flask-based GPG webservice that provides cryptographic operations (sig
 ## Architecture
 
 ### Core Components
+
 - **Flask Application** (`app.py`): Main entry point with blueprint registration
 - **Models** (`models/`): SQLAlchemy database models for users, PGP keys, and challenges
 - **Services** (`services/`): Business logic layer for user management, authentication, and challenge handling
@@ -17,6 +18,7 @@ This is a Flask-based GPG webservice that provides cryptographic operations (sig
 - **Database** (`db/`): SQLAlchemy configuration and initialization
 
 ### Security Model
+
 - Users authenticate with API keys (SHA256 hashed and used as GPG passphrases)
 - Private keys are encrypted with Argon2id + AES-GCM using password-derived keys
 - All GPG operations use temporary, isolated keyrings for security
@@ -25,6 +27,7 @@ This is a Flask-based GPG webservice that provides cryptographic operations (sig
 ## Common Development Commands
 
 ### Testing
+
 ```bash
 # Run all tests in Docker (recommended for isolation)
 docker-compose run --rm test-runner pytest tests/ -v
@@ -42,6 +45,7 @@ docker-compose run --rm test-runner pytest tests/test_app.py::test_register -v
 ```
 
 ### Local Development
+
 ```bash
 # Start development server
 docker-compose up gpg-webservice
@@ -57,6 +61,7 @@ pip install -r requirements.txt
 ```
 
 ### Database Operations
+
 ```bash
 # Reset database
 rm -f gpg_users.db instance/gpg_users.db
@@ -71,6 +76,7 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 ## Key Implementation Details
 
 ### GPG Operations
+
 - All GPG operations must use temporary directories (`tempfile.mkdtemp()`) for isolation
 - GPG agent is disabled via environment variables (`GPG_AGENT_INFO=""`, `DISPLAY=""`)
 - Private key passphrases are derived from API keys: `hashlib.sha256(api_key.encode()).hexdigest()`
@@ -78,17 +84,20 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 - Private keys are encrypted before database storage using `crypto_utils.encrypt_private_key()`
 
 ### Authentication Flow
+
 1. User registration generates API key and RSA keypair
 2. Private key is encrypted with password-derived key before storage
 3. API key serves dual purpose: authentication token and GPG passphrase base
 4. All protected endpoints require `X-API-KEY` header validation
 
 ### Database Models
+
 - `User`: username, password_hash, api_key
 - `PgpKey`: user_id, key_type ('public'/'private'), key_data (ASCII-armored)
 - `Challenge`: user_id, challenge_data, signature, created_at
 
 ### Error Handling Patterns
+
 - Use try/except blocks around all GPG operations with proper cleanup
 - Return meaningful error messages without exposing sensitive details
 - Always clean up temporary directories in finally blocks
@@ -97,12 +106,14 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 ## Testing Considerations
 
 ### Test Environment
+
 - Tests run in Docker with complete GPG isolation
 - Each test uses fresh database state (SQLite in-memory or temporary files)
 - Test fixtures include pre-generated Alice/Bob GPG keys in `tests/fixtures/`
 - All tests must clean up temporary files and directories
 
 ### Test Patterns
+
 - Use `register_user()` helper function for user setup in integration tests
 - Mock external dependencies in unit tests
 - Test both success and failure scenarios for all endpoints
@@ -127,6 +138,7 @@ sqlite3 gpg_users.db "SELECT username, api_key FROM users;"
 ## OpenAI Integration
 
 The service includes specialized endpoints for OpenAI function calling integration:
+
 - `/openai/function_definitions` - Get function definitions for OpenAI
 - `/openai/register_user` - Register user via AI function call
 - `/openai/sign_text` - Sign text content via AI function call
@@ -135,6 +147,7 @@ The service includes specialized endpoints for OpenAI function calling integrati
 ## Dependencies
 
 Core dependencies from requirements.txt:
+
 - `flask` - Web framework
 - `flask-sqlalchemy` - Database ORM
 - `werkzeug` - WSGI utilities

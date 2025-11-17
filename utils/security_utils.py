@@ -57,8 +57,17 @@ class RateLimiter:
 
 
 # Global rate limiters for different endpoint types
-auth_rate_limiter = RateLimiter(max_requests=5, window_seconds=60)  # 5 auth attempts per minute
-api_rate_limiter = RateLimiter(max_requests=30, window_seconds=60)  # 30 API calls per minute
+# Note: These will be initialized with config values at import time
+from config import Config
+
+auth_rate_limiter = RateLimiter(
+    max_requests=Config.RATE_LIMIT_AUTH_REQUESTS,
+    window_seconds=Config.RATE_LIMIT_AUTH_WINDOW
+)
+api_rate_limiter = RateLimiter(
+    max_requests=Config.RATE_LIMIT_API_REQUESTS,
+    window_seconds=Config.RATE_LIMIT_API_WINDOW
+)
 
 
 def rate_limit_auth(f):
@@ -69,12 +78,15 @@ def rate_limit_auth(f):
         from flask import current_app
         if current_app and current_app.config.get('TESTING'):
             return f(*args, **kwargs)
-            
+
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-        
+
         if not auth_rate_limiter.is_allowed(client_ip):
+            # Log rate limit violation
+            from utils.audit_logger import audit_logger
+            audit_logger.log_rate_limit_hit('auth', username=None)
             return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
-        
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -87,12 +99,15 @@ def rate_limit_api(f):
         from flask import current_app
         if current_app and current_app.config.get('TESTING'):
             return f(*args, **kwargs)
-            
+
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-        
+
         if not api_rate_limiter.is_allowed(client_ip):
+            # Log rate limit violation
+            from utils.audit_logger import audit_logger
+            audit_logger.log_rate_limit_hit('api', username=None)
             return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
-        
+
         return f(*args, **kwargs)
     return decorated_function
 
