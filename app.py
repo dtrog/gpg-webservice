@@ -1,21 +1,17 @@
 import os
-from flask import Flask, request, jsonify, send_file, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Flask, request, send_from_directory
 from config import get_config
 from db.database import db, init_db
 from models.user import User
 from models.pgp_key import PgpKey
 from models.challenge import Challenge
-from services.auth_service import hash_password, verify_password, get_user_by_api_key
-from utils.crypto_utils import encrypt_private_key, decrypt_private_key, generate_api_key
+from utils.crypto_utils import encrypt_private_key, decrypt_private_key
 from utils.gpg_utils import generate_gpg_keypair
-import base64
 
 from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
 from routes.openai_routes import openai_bp, get_function_definitions
 from utils.security_utils import add_security_headers
-from utils.audit_logger import audit_logger
 
 # Load configuration
 app = Flask(__name__)

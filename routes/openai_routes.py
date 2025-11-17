@@ -28,26 +28,30 @@ def require_api_key_json(f):
     """
     Decorator for API key authentication that returns JSON responses
     suitable for OpenAI function calling.
+
+    Passes both user and raw API key to decorated functions.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        api_key = request.headers.get('X-API-KEY')
-        if not api_key:
+        raw_api_key = request.headers.get('X-API-KEY')
+        if not raw_api_key:
             return jsonify({
                 'success': False,
                 'error': 'API key required',
                 'error_code': 'AUTH_REQUIRED'
             }), 401
-            
-        user = get_user_by_api_key(api_key)
+
+        user = get_user_by_api_key(raw_api_key)
         if not user:
             return jsonify({
                 'success': False,
                 'error': 'Invalid API key',
                 'error_code': 'AUTH_INVALID'
             }), 403
-            
-        return f(user, *args, **kwargs)
+
+        # Pass both user and raw API key to the decorated function
+        # The raw API key is needed for GPG passphrase derivation
+        return f(user, raw_api_key, *args, **kwargs)
     return decorated_function
 
 @openai_bp.route('/register_user', methods=['POST'])
@@ -113,23 +117,23 @@ def register_user_function():
             }), 400
             
         user_service = UserService()
-        user, key_pair_or_error = user_service.register_user(username, password)
-        
-        if user:
+        registration_result, error = user_service.register_user(username, password)
+
+        if registration_result:
             return jsonify({
                 'success': True,
                 'data': {
-                    'user_id': user.id,
-                    'username': user.username,
-                    'api_key': user.api_key,
-                    'public_key': key_pair_or_error.public_key.key_data
+                    'user_id': registration_result.user.id,
+                    'username': registration_result.user.username,
+                    'api_key': registration_result.api_key,
+                    'public_key': registration_result.pgp_keypair.public_key
                 },
                 'message': 'User registered successfully'
             }), 201
         else:
             return jsonify({
                 'success': False,
-                'error': key_pair_or_error,
+                'error': error,
                 'error_code': 'REGISTRATION_FAILED'
             }), 400
             
@@ -143,7 +147,7 @@ def register_user_function():
 @openai_bp.route('/sign_text', methods=['POST'])
 @require_api_key_json
 @rate_limit_api
-def sign_text_function(user):
+def sign_text_function(user, raw_api_key):
     """
     OpenAI Function: Sign text content using user's private key.
     
@@ -193,9 +197,9 @@ def sign_text_function(user):
             # Create signature file path
             signature_path = temp_file_path + '.sig'
             
-            # Sign the file
-            sign_file(temp_file_path, private_key.key_data, signature_path, 
-                     derive_gpg_passphrase(user.api_key, user.id))
+            # Sign the file using RAW API key for passphrase derivation
+            sign_file(temp_file_path, private_key.key_data, signature_path,
+                     derive_gpg_passphrase(raw_api_key, user.id))
             
             # Read signature and encode as base64
             with open(signature_path, 'rb') as sig_file:
@@ -229,7 +233,7 @@ def sign_text_function(user):
 @openai_bp.route('/verify_text_signature', methods=['POST'])
 @require_api_key_json
 @rate_limit_api
-def verify_text_signature_function(user):
+def verify_text_signature_function(user, raw_api_key):
     """
     OpenAI Function: Verify a text signature against a public key.
     
@@ -308,7 +312,7 @@ def verify_text_signature_function(user):
 @openai_bp.route('/encrypt_text', methods=['POST'])
 @require_api_key_json
 @rate_limit_api
-def encrypt_text_function(user):
+def encrypt_text_function(user, raw_api_key):
     """
     OpenAI Function: Encrypt text for a recipient using their public key.
     
@@ -379,7 +383,7 @@ def encrypt_text_function(user):
 @openai_bp.route('/decrypt_text', methods=['POST'])
 @require_api_key_json
 @rate_limit_api
-def decrypt_text_function(user):
+def decrypt_text_function(user, raw_api_key):
     """
     OpenAI Function: Decrypt text using user's private key.
     
@@ -430,12 +434,12 @@ def decrypt_text_function(user):
         try:
             # Create default decrypted file path
             default_path = enc_file_path + '.dec'
-            # Decrypt the file (decrypt_file returns path to decrypted file)
+            # Decrypt the file using RAW API key for passphrase derivation
             decrypted_file_path = decrypt_file(
                 enc_file_path,
                 private_key.key_data,
                 default_path,
-                derive_gpg_passphrase(user.api_key, user.id)
+                derive_gpg_passphrase(raw_api_key, user.id)
             ) or default_path
 
             # Read decrypted content
@@ -466,7 +470,7 @@ def decrypt_text_function(user):
 @openai_bp.route('/get_user_public_key', methods=['POST'])
 @require_api_key_json
 @rate_limit_api
-def get_user_public_key_function(user):
+def get_user_public_key_function(user, raw_api_key):
     """
     OpenAI Function: Get the authenticated user's public key.
     

@@ -111,7 +111,7 @@ def sign(user, raw_api_key):
 @gpg_bp.route('/verify', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def verify(user):
+def verify(user, raw_api_key):
     if 'file' not in request.files or 'pubkey' not in request.files:
         return jsonify({'error': 'file and pubkey required'}), 400
     sig_file = request.files['file']  # This is the signature file
@@ -180,7 +180,7 @@ def verify(user):
 @gpg_bp.route('/encrypt', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def encrypt(user):
+def encrypt(user, raw_api_key):
     if 'file' not in request.files or 'pubkey' not in request.files:
         return jsonify({'error': 'file and pubkey required'}), 400
     file = request.files['file']
@@ -212,11 +212,11 @@ def encrypt(user):
 @gpg_bp.route('/decrypt', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def decrypt(user):
+def decrypt(user, raw_api_key):
     if 'file' not in request.files:
         return jsonify({'error': 'file required'}), 400
     file = request.files['file']
-    
+
     # Validate file upload
     valid, error = validate_file_upload(file, max_size_mb=10)
     if not valid:
@@ -231,8 +231,8 @@ def decrypt(user):
             return jsonify({'error': 'Private key not found'}), 404
         dec_path = os.path.join(tmpdir, filename + '.dec')
         try:
-            # Use secure passphrase derivation with user ID as salt
-            gpg_passphrase = derive_gpg_passphrase(user.api_key, user.id)
+            # Use secure passphrase derivation with user ID as salt and RAW API key
+            gpg_passphrase = derive_gpg_passphrase(raw_api_key, user.id)
             decrypt_file(input_path, privkey.key_data, dec_path, gpg_passphrase)
         except Exception as e:
             return jsonify({'error': f'Decryption failed: {str(e)}'}), 500
@@ -242,7 +242,7 @@ def decrypt(user):
 @gpg_bp.route('/challenge', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def challenge(user):
+def challenge(user, raw_api_key):
     challenge_service = ChallengeService()
     challenge = challenge_service.create_challenge(user.id)
     return jsonify({'challenge': challenge.challenge_data, 'challenge_id': challenge.id}), 201
@@ -251,7 +251,7 @@ def challenge(user):
 @gpg_bp.route('/verify_challenge', methods=['POST'])
 @rate_limit_api
 @require_api_key
-def verify_challenge(user):
+def verify_challenge(user, raw_api_key):
     data = request.get_json()
     challenge_data = data.get('challenge')
     signature = data.get('signature')
@@ -268,7 +268,7 @@ def verify_challenge(user):
 @gpg_bp.route('/get_public_key', methods=['GET'])
 @rate_limit_api
 @require_api_key
-def get_public_key(user):
+def get_public_key(user, raw_api_key):
     pubkey = PgpKey.query.filter_by(user_id=user.id, key_type=PgpKeyType.PUBLIC).first()
     if not pubkey:
         return jsonify({'error': 'Public key not found'}), 404
