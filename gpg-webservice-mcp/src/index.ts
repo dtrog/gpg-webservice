@@ -46,10 +46,11 @@ function getConfig(): MCPConfig {
 
 /**
  * Fetch function definitions from the Flask GPG webservice
+ * Returns both the function definitions and the base_url from the response
  */
 async function fetchFunctionDefinitions(
   baseUrl: string
-): Promise<FunctionDefinition[]> {
+): Promise<{ functions: FunctionDefinition[]; baseUrl: string }> {
   const url = `${baseUrl}/openai/function_definitions`;
 
   try {
@@ -66,7 +67,17 @@ async function fetchFunctionDefinitions(
       throw new Error('Invalid response from function_definitions endpoint');
     }
 
-    return data.data.functions;
+    // Use the base_url returned by Flask, or fall back to the configured base
+    const flaskBaseUrl = data.data.base_url
+      ? (data.data.base_url.endsWith('/')
+          ? data.data.base_url.slice(0, -1)
+          : data.data.base_url)
+      : baseUrl;
+
+    return {
+      functions: data.data.functions,
+      baseUrl: flaskBaseUrl
+    };
   } catch (error) {
     console.error('Error fetching function definitions:', error);
     throw error;
@@ -135,26 +146,32 @@ async function callFlaskEndpoint(
 
 /**
  * Format Flask response for MCP client
+ * Returns both human-readable text and structured JSON content
  */
 function formatMCPResponse(flaskResponse: FlaskResponse): {
-  content: Array<{ type: string; text: string }>;
+  content: Array<{ type: string; text?: string; data?: any }>;
   isError?: boolean;
 } {
   if (flaskResponse.success) {
-    // Success response
+    // Success response with both text and structured data
     const message = flaskResponse.message || 'Operation completed successfully';
-    const dataStr = flaskResponse.data
-      ? JSON.stringify(flaskResponse.data, null, 2)
-      : '';
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `${message}\n\nData:\n${dataStr}`,
-        },
-      ],
-    };
+    const content: Array<{ type: string; text?: string; data?: any }> = [
+      {
+        type: 'text',
+        text: message,
+      }
+    ];
+
+    // Add structured data if present
+    if (flaskResponse.data) {
+      content.push({
+        type: 'resource',
+        data: flaskResponse.data
+      });
+    }
+
+    return { content };
   } else {
     // Error response
     const errorMessage =
@@ -180,14 +197,18 @@ async function main() {
   const config = getConfig();
 
   console.error('Starting GPG Webservice MCP Server...');
-  console.error(`API Base URL: ${config.gpgApiBase}`);
+  console.error(`API Base URL (initial): ${config.gpgApiBase}`);
   console.error(`API Key: ${config.gpgApiKey ? '***configured***' : 'not configured'}`);
 
   // Fetch function definitions on startup
   let functionDefinitions: FunctionDefinition[];
+  let actualBaseUrl: string;
   try {
-    functionDefinitions = await fetchFunctionDefinitions(config.gpgApiBase);
+    const result = await fetchFunctionDefinitions(config.gpgApiBase);
+    functionDefinitions = result.functions;
+    actualBaseUrl = result.baseUrl;
     console.error(`Loaded ${functionDefinitions.length} function definitions`);
+    console.error(`Using base URL from Flask: ${actualBaseUrl}`);
   } catch (error) {
     console.error('Failed to load function definitions. Exiting.');
     process.exit(1);
@@ -238,9 +259,9 @@ async function main() {
     const parameters = { ...(args as Record<string, any>) };
     delete parameters.api_key;
 
-    // Call the Flask endpoint
+    // Call the Flask endpoint using the base URL from Flask
     const flaskResponse = await callFlaskEndpoint(
-      config.gpgApiBase,
+      actualBaseUrl,
       name,
       parameters,
       apiKey

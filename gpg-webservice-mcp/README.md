@@ -258,16 +258,41 @@ const result = await client.callTool({
 └─────────────────┘
 ```
 
+### Transport Layer: stdio vs HTTP
+
+**Current Implementation**: This MCP server uses **stdio transport** (standard input/output), which is the recommended approach for MCP servers. The server communicates with MCP clients through stdin/stdout, while making HTTP requests to the Flask backend.
+
+**Why stdio?**
+- Standard MCP pattern - clients like Claude Desktop expect stdio
+- Secure - no network exposure of the MCP server itself
+- Simple - no need for port management or HTTPS certificates
+- Efficient - direct process communication
+
+**HTTP Transport (Alternative)**:
+If you need the MCP server to be network-accessible (e.g., for web-based ChatGPT connections), you would need to:
+1. Use `SSEServerTransport` or a custom HTTP transport
+2. Add authentication/authorization middleware
+3. Handle CORS and security considerations
+4. Deploy behind a reverse proxy with HTTPS
+
+The current stdio implementation is suitable for:
+- Claude Desktop integration
+- Local AI assistants
+- Command-line MCP clients
+- Any client that can spawn child processes
+
+For network-based ChatGPT connectors, you may need to wrap this server with an HTTP bridge or use a different transport mechanism.
+
 ### How It Works
 
-1. **Startup**: The MCP server fetches function definitions from `/openai/function_definitions`
+1. **Startup**: The MCP server fetches function definitions from `/openai/function_definitions` and uses the `base_url` returned by Flask
 2. **Tool Registration**: Each function is registered as an MCP tool with its schema
 3. **Tool Invocation**: When a tool is called:
    - Parameters are validated against the schema
    - API key is added to the request header (from env or per-request)
-   - HTTP POST is made to the Flask endpoint
+   - HTTP POST is made to the Flask endpoint at the dynamically discovered base URL
    - Response is formatted for the MCP client
-4. **Response Formatting**: Flask responses are converted to MCP format with structured content
+4. **Response Formatting**: Flask responses are converted to MCP format with both human-readable text and structured JSON data for AI model consumption
 
 ## Error Handling
 
