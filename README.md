@@ -38,7 +38,7 @@ git clone <repository-url>
 cd gpg-webservice
 
 # Start the service
-docker-compose up webservice
+docker-compose up gpg-webservice
 
 # Run tests
 docker-compose run --rm test-runner pytest tests/ -v
