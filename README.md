@@ -23,7 +23,9 @@ A secure Flask-based webservice providing GPG cryptographic operations through H
 
 ### Authentication & Authorization
 
-- **API Key Authentication**: Secure token-based authentication for all operations
+- **API Key Authentication**: SHA256-hashed keys stored in database, returned once at registration
+- **Password Hashing**: Argon2id (OWASP recommended) for secure password storage
+- **Comprehensive Audit Logging**: All security events logged in structured JSON format
 - **Reserved Username Protection**: Prevents registration of system usernames
 - **Email Validation**: RFC-compliant email address validation
 - **Challenge-Response**: Optional cryptographic challenge authentication
@@ -51,10 +53,10 @@ docker-compose run --rm test-runner pytest tests/ -v
 pip install -r requirements.txt
 
 # Initialize database
-python -c "from app import init_db; init_db()"
+python3 init_database.py
 
-# Start the service
-python app.py
+# Start the service (automatically initializes DB if needed)
+python3 app.py
 ```
 
 ## 📡 API Endpoints
@@ -84,15 +86,17 @@ curl -X POST http://localhost:5000/register \
 **Response:**
 ```json
 {
-  "message": "User registered successfully",
+  "message": "User registered",
   "user_id": 1,
-  "api_key": "abc123...",
+  "api_key": "sk_abc123...",
   "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----..."
 }
 ```
 
+**⚠️ Security Note:** The `api_key` is **only returned once** at registration. Store it securely - it cannot be retrieved again through login.
+
 #### `POST /login`
-Authenticate and retrieve API key.
+Authenticate user credentials.
 
 ```bash
 curl -X POST http://localhost:5000/login \
@@ -102,6 +106,16 @@ curl -X POST http://localhost:5000/login \
     "password": "SecurePass123!"
   }'
 ```
+
+**Response:**
+```json
+{
+  "message": "Login successful",
+  "user_id": 1
+}
+```
+
+**Note:** Login does **not** return the API key. Use the key from registration for authentication.
 
 ### Cryptographic Endpoints
 
@@ -351,8 +365,8 @@ The database uses polymorphic models for type safety:
 CREATE TABLE users (
     id INTEGER PRIMARY KEY,
     username VARCHAR UNIQUE NOT NULL,
-    password_hash VARCHAR NOT NULL,
-    api_key VARCHAR UNIQUE NOT NULL
+    password_hash VARCHAR NOT NULL,  -- Argon2id hashed
+    api_key_hash VARCHAR UNIQUE NOT NULL  -- SHA256 hashed
 );
 
 -- Polymorphic PGP Keys table with enum support
@@ -558,7 +572,7 @@ docker-compose run --rm test-runner pytest tests/ -v
 
 ```bash
 rm -f gpg_users.db instance/gpg_users.db
-python -c "from app import init_db; init_db()"
+python3 init_database.py
 ```
 
 ## 🤝 Contributing
@@ -588,11 +602,17 @@ For security issues, please contact the maintainers directly rather than opening
 ---
 
 **Recent Security Enhancements** (Latest Version):
-- Enhanced passphrase derivation with PBKDF2-HMAC-SHA256
-- Comprehensive input validation and rate limiting
-- HTTP security headers and file upload protection
-- Polymorphic database models with enum type safety
-- Challenge-response authentication system
-- Production-ready security configuration
 
-For detailed technical information, see the `doc/` directory.
+- **API Key Hashing**: SHA256-hashed storage, keys only returned once at registration
+- **Argon2id Password Hashing**: OWASP-recommended password hashing algorithm
+- **Comprehensive Audit Logging**: Structured JSON logging for all security events
+- **Enhanced Passphrase Derivation**: PBKDF2-HMAC-SHA256 with user-specific salts
+- **Centralized Configuration**: Environment-based security configuration
+- **Session Management**: Context managers for safe database operations
+- **Standardized Error Handling**: Consistent error responses, no information leakage
+- **CSRF Protection**: API-only architecture with custom header authentication
+- **Input Validation & Rate Limiting**: Comprehensive protection against abuse
+- **HTTP Security Headers**: Complete security header suite (CSP, HSTS, etc.)
+- **Security Integration Tests**: 26+ tests covering authentication, audit logging, and more
+
+For detailed technical information, see the `docs/` directory.

@@ -49,7 +49,6 @@ gpg_users.db
 
 # Secrets
 .env
-.env.*
 
 # Build
 build/
