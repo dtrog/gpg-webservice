@@ -23,7 +23,6 @@ services:
       - DATABASE=/app/test.db
     volumes:
       - /tmp/gpg-test:/tmp/gnupg
-      - /tmp/gpg-docker:/tmp/gnupg
     networks:
       - gpg-network
     profiles:
