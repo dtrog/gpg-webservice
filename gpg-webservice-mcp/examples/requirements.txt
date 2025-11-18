@@ -1,2 +1,2 @@
 # Requirements for OpenAI Agent SDK examples
-openai-agents-sdk>=0.1.0
+openai-agents

@@ -624,7 +624,12 @@ def get_function_definitions():
         'success': True,
         'data': {
             'functions': functions,
-            'base_url': request.host_url + 'openai/',
+            'servers': [
+                {
+                    "url": "http://localhost:5555/openai/",
+                    "description": "Local development server"
+                }
+            ],
             'authentication': 'API key required via X-API-KEY header',
             'rate_limits': {
                 'api_endpoints': '30 requests per minute per IP'

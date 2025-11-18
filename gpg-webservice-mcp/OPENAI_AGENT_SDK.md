@@ -32,8 +32,8 @@ The OpenAI Agent SDK supports MCP (Model Context Protocol) servers through the `
 
 ```python
 import asyncio
-from openai_agents_sdk import Agent
-from openai_agents_sdk.mcp import MCPServerStreamableHttp
+from openai_agents import Agent
+from openai_agents.mcp import MCPServerStreamableHttp
 
 async def main():
     # Connect to the GPG MCP server
@@ -49,7 +49,7 @@ async def main():
         # Create agent with MCP tools
         agent = Agent(
             name="GPG Assistant",
-            model="gpt-4o",
+            model="gpt-5",
             instructions="""
             You are a GPG cryptography assistant. You can help users with:
             - Registering new GPG identities

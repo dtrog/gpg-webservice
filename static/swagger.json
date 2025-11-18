@@ -1,20 +1,927 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "GPG Webservice (partial)",
-    "version": "0.1.0",
-    "description": "A minimal OpenAPI description for the GPG Webservice — add more paths as needed."
+    "title": "GPG Webservice API",
+    "version": "1.0.0",
+    "description": "A Flask-based GPG webservice that provides cryptographic operations (signing, verification, encryption, decryption) via HTTP endpoints. The service handles user registration, authentication, and automatic GPG key management with secure storage.",
+    "contact": {
+      "name": "GPG Webservice Support"
+    }
   },
-  "servers": [{ "url": "/" }],
+  "servers": [
+    {
+      "url": "http://localhost:5555",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "User Management",
+      "description": "User registration and authentication endpoints"
+    },
+    {
+      "name": "GPG Operations",
+      "description": "File-based GPG cryptographic operations"
+    },
+    {
+      "name": "OpenAI Integration",
+      "description": "OpenAI function calling compatible endpoints"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-KEY",
+        "description": "API key for authentication (obtained during user registration)"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          }
+        }
+      },
+      "OpenAIResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
   "paths": {
+    "/register": {
+      "post": {
+        "tags": ["User Management"],
+        "summary": "Register a new user",
+        "description": "Register a new user with automatic GPG keypair generation. Returns a one-time API key.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 50,
+                    "description": "Username (alphanumeric, underscore, hyphen)"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Password (must include uppercase, lowercase, digit, special char)"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address (optional)"
+                  },
+                  "public_key": {
+                    "type": "string",
+                    "description": "Pre-existing public key (optional)"
+                  },
+                  "private_key": {
+                    "type": "string",
+                    "description": "Pre-existing private key (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "type": "integer"
+                    },
+                    "api_key": {
+                      "type": "string",
+                      "description": "API key (only returned once - store it securely!)"
+                    },
+                    "public_key": {
+                      "type": "string",
+                      "description": "ASCII-armored public key"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": ["User Management"],
+        "summary": "User login",
+        "description": "Authenticate a user with username and password. Note: API key is NOT returned on login.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sign": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Sign a file",
+        "description": "Create a detached GPG signature for an uploaded file using the user's private key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to sign (max 5MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signature file (.sig)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Private key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Signing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Verify a file signature",
+        "description": "Verify a GPG signature against a public key. Supports both detached and inline signatures.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "pubkey"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Signature file or signed file"
+                  },
+                  "pubkey": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Public key file (ASCII-armored)"
+                  },
+                  "original": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Original file (required for detached signatures)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/encrypt": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Encrypt a file",
+        "description": "Encrypt a file using a recipient's public key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "pubkey"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to encrypt (max 10MB)"
+                  },
+                  "pubkey": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Recipient's public key (ASCII-armored)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Encrypted file (.gpg)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Encryption failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/decrypt": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Decrypt a file",
+        "description": "Decrypt a GPG-encrypted file using the user's private key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Encrypted file (.gpg, max 10MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decrypted file",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Private key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Decryption failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/challenge": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Create a challenge",
+        "description": "Generate a cryptographic challenge for authentication",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Challenge created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "challenge_id": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify_challenge": {
+      "post": {
+        "tags": ["GPG Operations"],
+        "summary": "Verify a challenge response",
+        "description": "Verify a signed challenge response",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["challenge", "signature"],
+                "properties": {
+                  "challenge": {
+                    "type": "string",
+                    "description": "Original challenge data"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Signature of the challenge"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_public_key": {
+      "get": {
+        "tags": ["GPG Operations"],
+        "summary": "Get user's public key",
+        "description": "Retrieve the authenticated user's ASCII-armored public key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public key retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "public_key": {
+                      "type": "string",
+                      "description": "ASCII-armored public key"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Public key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/openai/function_definitions": {
       "get": {
+        "tags": ["OpenAI Integration"],
         "summary": "Get OpenAI function definitions",
-        "responses": { "200": { "description": "Function definitions" } }
+        "description": "Retrieve function definitions for OpenAI function calling integration",
+        "responses": {
+          "200": {
+            "description": "Function definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/openai/register_user": {
-      "post": { "summary": "Register user (OpenAI-compatible)", "responses": { "200": { "description": "Registered" } } }
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Register user (OpenAI-compatible)",
+        "description": "Register a new user - OpenAI function calling compatible endpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password", "email"],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 50
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Registration failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openai/sign_text": {
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Sign text (OpenAI-compatible)",
+        "description": "Sign text content and return base64-encoded signature",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Text signed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openai/verify_text_signature": {
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Verify text signature (OpenAI-compatible)",
+        "description": "Verify a text signature against a public key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text", "signature", "public_key"],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Base64-encoded signature"
+                  },
+                  "public_key": {
+                    "type": "string",
+                    "description": "ASCII-armored public key"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openai/encrypt_text": {
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Encrypt text (OpenAI-compatible)",
+        "description": "Encrypt text for a recipient and return base64-encoded result",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text", "recipient_public_key"],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "recipient_public_key": {
+                    "type": "string",
+                    "description": "ASCII-armored public key of recipient"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Text encrypted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openai/decrypt_text": {
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Decrypt text (OpenAI-compatible)",
+        "description": "Decrypt base64-encoded encrypted text",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["encrypted_text"],
+                "properties": {
+                  "encrypted_text": {
+                    "type": "string",
+                    "description": "Base64-encoded encrypted content"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Text decrypted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openai/get_user_public_key": {
+      "post": {
+        "tags": ["OpenAI Integration"],
+        "summary": "Get public key (OpenAI-compatible)",
+        "description": "Get the authenticated user's public key",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Public key retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

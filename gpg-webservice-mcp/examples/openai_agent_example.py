@@ -13,8 +13,8 @@ Usage:
 
 import asyncio
 import os
-from openai_agents_sdk import Agent
-from openai_agents_sdk.mcp import MCPServerStreamableHttp
+from openai.agents import Agent
+from openai.agents.mcp import MCPServerStreamableHttp
 
 
 async def main():

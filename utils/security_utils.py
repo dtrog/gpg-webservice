@@ -217,31 +217,42 @@ def secure_temp_directory() -> str:
 def add_security_headers(response):
     """
     Add security headers to Flask response.
-    
+
     Args:
         response: Flask response object
-        
+
     Returns:
         Response object with security headers added
     """
     # Prevent clickjacking
     response.headers['X-Frame-Options'] = 'DENY'
-    
+
     # Prevent MIME type sniffing
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    
+
     # Enable XSS protection
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    
+
     # Strict transport security (HTTPS only)
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    
-    # Content security policy
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
-    
+
+    # Content security policy - relaxed for Swagger UI page
+    if request.path == '/swagger-ui':
+        # Allow unpkg.com for Swagger UI resources
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+            "font-src 'self' https://unpkg.com; "
+            "img-src 'self' data: https://unpkg.com"
+        )
+    else:
+        # Strict CSP for all other pages
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+
     # Referrer policy
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    
+
     return response
 
 
