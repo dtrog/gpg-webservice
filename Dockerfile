@@ -26,8 +26,8 @@ ENV GNUPGHOME=/tmp/gnupg
 ENV GPG_AGENT_INFO=""
 ENV GPG_TTY=""
 
-# Configure Flask port via environment variable (default 5000)
-ENV PORT=5000
+# Configure Flask port via environment variable (default 5555)
+ENV PORT=5555
 ENV HOST=0.0.0.0
 
 # Expose the Flask port (can be overridden)
