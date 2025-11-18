@@ -21,6 +21,8 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     TESTING = os.environ.get('TESTING', 'false').lower() == 'true'
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+    PORT = int(os.environ.get('PORT', 5000))
+    HOST = os.environ.get('HOST', '0.0.0.0')
 
     # Database
     DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///gpg_users.db')

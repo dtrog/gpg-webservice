@@ -4,3 +4,4 @@ werkzeug
 cryptography
 argon2-cffi
 pytest
+python-dotenv

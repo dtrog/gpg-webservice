@@ -10,7 +10,7 @@ The OpenAI Agent SDK supports MCP (Model Context Protocol) servers through the `
 
 1. **Python 3.10+** with OpenAI Agent SDK installed:
    ```bash
-   pip install openai-agents-sdk
+   pip install openai-agents
    ```
 
 2. **Running MCP HTTP Server**:

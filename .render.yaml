@@ -1,10 +1,44 @@
 services:
+  # Flask GPG Webservice
   - type: web
     name: gpg-webservice
     runtime: docker
     region: frankfurt
     plan: free
+    dockerfilePath: ./Dockerfile
     envVars:
+      - key: PORT
+        value: 5000  # Render uses PORT environment variable
+      - key: HOST
+        value: 0.0.0.0
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true  # Render will auto-generate a secure key
+      - key: DATABASE_URL
+        value: sqlite:///gpg_users.db
       - key: OPENAI_API_KEY
-        value: YOUR_SECRET_KEY  # Set this manually in the Render dashboard, not from .env
+        sync: false  # Set this manually in Render dashboard
+    disk:
+      name: gpg-data
+      mountPath: /app
+      sizeGB: 1
+    healthCheckPath: /openai/function_definitions
+    autoDeploy: true
+
+  # MCP HTTP Server (Optional - deploy if you need MCP/AI agent access)
+  - type: web
+    name: gpg-mcp-server
+    runtime: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: ./gpg-webservice-mcp/Dockerfile
+    envVars:
+      - key: MCP_PORT
+        value: 3000
+      - key: MCP_HOST
+        value: 0.0.0.0
+      - key: GPG_API_BASE
+        value: https://gpg-webservice.onrender.com  # Update with your actual Flask service URL
+    healthCheckPath: /health
     autoDeploy: true
