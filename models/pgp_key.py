@@ -5,10 +5,12 @@ from sqlalchemy import Enum
 from abc import abstractmethod
 import hashlib
 
+
 class PgpKeyType(enum.Enum):
     """Enumeration for PGP key types."""
     PUBLIC = "public"
     PRIVATE = "private"
+
 
 class PgpKey(db.Model):
     """

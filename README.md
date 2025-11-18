@@ -67,7 +67,7 @@ python3 app.py
 Register a new user account with automatic GPG key generation.
 
 ```bash
-curl -X POST http://localhost:5000/register \
+curl -X POST http://localhost:5555/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "alice",
@@ -99,7 +99,7 @@ curl -X POST http://localhost:5000/register \
 Authenticate user credentials.
 
 ```bash
-curl -X POST http://localhost:5000/login \
+curl -X POST http://localhost:5555/login \
   -H "Content-Type: application/json" \
   -d '{
     "username": "alice",
@@ -125,7 +125,7 @@ All cryptographic endpoints require the `X-API-KEY` header and are protected by 
 Sign a file with the user's private key.
 
 ```bash
-curl -X POST http://localhost:5000/sign \
+curl -X POST http://localhost:5555/sign \
   -H "X-API-KEY: your_api_key" \
   -F "file=@document.txt"
 ```
@@ -139,7 +139,7 @@ curl -X POST http://localhost:5000/sign \
 Verify a file signature against a public key.
 
 ```bash
-curl -X POST http://localhost:5000/verify \
+curl -X POST http://localhost:5555/verify \
   -H "X-API-KEY: your_api_key" \
   -F "file=@document.txt.sig" \
   -F "pubkey=@public_key.asc"
@@ -149,7 +149,7 @@ curl -X POST http://localhost:5000/verify \
 Encrypt a file for a specific recipient.
 
 ```bash
-curl -X POST http://localhost:5000/encrypt \
+curl -X POST http://localhost:5555/encrypt \
   -H "X-API-KEY: your_api_key" \
   -F "file=@document.txt" \
   -F "pubkey=@recipient_public_key.asc"
@@ -164,7 +164,7 @@ curl -X POST http://localhost:5000/encrypt \
 Decrypt a file using the user's private key.
 
 ```bash
-curl -X POST http://localhost:5000/decrypt \
+curl -X POST http://localhost:5555/decrypt \
   -H "X-API-KEY: your_api_key" \
   -F "file=@document.txt.gpg"
 ```
@@ -174,7 +174,7 @@ Retrieve the user's public key.
 
 ```bash
 curl -H "X-API-KEY: your_api_key" \
-  http://localhost:5000/get_public_key
+  http://localhost:5555/get_public_key
 ```
 
 #### Challenge-Response Authentication
@@ -183,11 +183,11 @@ Create and verify cryptographic challenges for enhanced security:
 
 ```bash
 # Create challenge
-curl -X POST http://localhost:5000/challenge \
+curl -X POST http://localhost:5555/challenge \
   -H "X-API-KEY: your_api_key"
 
 # Verify challenge (with signature)
-curl -X POST http://localhost:5000/verify_challenge \
+curl -X POST http://localhost:5555/verify_challenge \
   -H "X-API-KEY: your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -204,7 +204,7 @@ The GPG Webservice includes specialized endpoints designed for seamless integrat
 
 ```bash
 # Get function definitions for OpenAI
-curl -X GET http://localhost:5000/openai/function_definitions
+curl -X GET http://localhost:5555/openai/function_definitions
 ```
 
 ### Available AI Functions
@@ -262,7 +262,7 @@ functions = [
 ]
 
 def call_gpg_function(function_name, arguments, api_key=None):
-    url = f"http://localhost:5000/openai/{function_name}"
+    url = f"http://localhost:5555/openai/{function_name}"
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["X-API-KEY"] = api_key
@@ -451,7 +451,7 @@ services:
   webservice:
     build: .
     ports:
-      - "5000:5000"
+      - "5555:5555"
     environment:
       - FLASK_ENV=development
       - DATABASE_URL=sqlite:///gpg_users.db

@@ -1,5 +1,6 @@
 flask
 flask-sqlalchemy
+flask-cors
 werkzeug
 cryptography
 argon2-cffi

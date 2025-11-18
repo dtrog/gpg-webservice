@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request, send_from_directory
+from flask_cors import CORS
 from config import get_config
 from db.database import db, init_db
 from models.user import User
@@ -17,6 +18,16 @@ from utils.security_utils import add_security_headers
 app = Flask(__name__)
 config_class = get_config()
 app.config.from_object(config_class)
+
+# Initialize CORS
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:8080", "http://localhost:5555"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "X-API-KEY"],
+        "expose_headers": ["Content-Disposition"]
+    }
+})
 
 # Initialize database
 init_db(app)
