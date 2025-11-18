@@ -62,3 +62,5 @@ node_modules/
 
 # Ignore test artifacts
 tests/fixtures/*.asc
+package-lock.json
+gpg-webservice-mcp/package-lock.json
