@@ -8,7 +8,7 @@ services:
     dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
-        value: 5000  # Render uses PORT environment variable
+        value: 5555  # Render uses PORT environment variable
       - key: HOST
         value: 0.0.0.0
       - key: FLASK_ENV

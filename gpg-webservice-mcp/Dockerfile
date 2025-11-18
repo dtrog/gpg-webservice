@@ -21,7 +21,7 @@ RUN npm prune --production
 # Set default environment variables
 ENV MCP_PORT=3000
 ENV MCP_HOST=0.0.0.0
-ENV GPG_API_BASE=http://gpg-webservice.onrender.com:5555
+ENV GPG_API_BASE=http://localhost:5555
 
 # Expose MCP HTTP port
 EXPOSE 3000
