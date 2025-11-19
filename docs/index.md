@@ -9,7 +9,10 @@ Welcome to the GPG Webservice documentation! This index provides quick access to
 | [README.md](../README.md) | All Users | Quick start guide and project overview |
 | [API Reference](api_reference.md) | API Users | Complete endpoint documentation with examples |
 | [Technical Overview](overview.md) | Developers | Architecture and implementation details |
+| [**Architecture Guide**](architecture.md) **NEW** | Developers | System architecture with design patterns and data flow |
+| [**GPG Command Builder Guide**](gpg_command_builder_guide.md) **NEW** | Developers | API reference for GPGCommandBuilder pattern |
 | [Development Guide](development.md) | Contributors | Development setup and contribution guidelines |
+| [**Refactoring Changelog**](refactoring_changelog_2025.md) **NEW** | Developers | Complete history of 2025 code improvements |
 
 ## 🚀 Quick Start Paths
 
@@ -19,9 +22,11 @@ Welcome to the GPG Webservice documentation! This index provides quick access to
 3. **Examples**: [API Reference - Usage Examples](api_reference.md#usage-examples) - Copy-paste code examples
 
 ### For Developers
-1. **Architecture**: [Technical Overview](overview.md) - Understand the system design
-2. **Setup**: [Development Guide](development.md) - Set up your development environment
-3. **Contributing**: [Development Guide - Contributing](development.md#contributing-guidelines) - Submit your improvements
+1. **Architecture**: [Architecture Guide](architecture.md) - Understand the layered system design
+2. **Code Patterns**: [GPG Command Builder Guide](gpg_command_builder_guide.md) - Learn the builder pattern
+3. **Recent Improvements**: [Refactoring Changelog](refactoring_changelog_2025.md) - See 2025 code quality improvements
+4. **Setup**: [Development Guide](development.md) - Set up your development environment
+5. **Contributing**: [Development Guide - Contributing](development.md#contributing-guidelines) - Submit your improvements
 
 ### For Security Reviewers
 1. **Security Architecture**: [Technical Overview - Security](overview.md#security-architecture) - Review security design
@@ -44,12 +49,17 @@ Welcome to the GPG Webservice documentation! This index provides quick access to
 - [GPG Implementation](overview.md#utility-layer-utils) - Low-level GPG operations
 
 ### System Architecture
+- [**Architecture Overview**](architecture.md) **NEW** - Complete system architecture with layered design
+- [**Design Patterns**](architecture.md#design-patterns) **NEW** - Builder, DRY, and Template Method patterns
+- [**Data Flow Diagrams**](architecture.md#data-flow) **NEW** - Visual flow of operations
 - [Database Design](overview.md#database-layer-models) - Data models and relationships
 - [Service Layer](overview.md#service-layer-services) - Business logic organization
 - [Docker Architecture](overview.md#docker-configuration) - Containerization strategy
 - [Testing Strategy](overview.md#testing-strategy) - How testing is organized
 
 ### Development Workflows
+- [**Refactoring History**](refactoring_changelog_2025.md) **NEW** - Complete 2025 code quality improvements
+- [**GPG Command Builder API**](gpg_command_builder_guide.md) **NEW** - Builder pattern usage guide
 - [Environment Setup](development.md#development-environment-setup) - Get started developing
 - [Adding Features](development.md#adding-new-features) - How to add new functionality
 - [Testing Guide](development.md#testing-strategy) - How to write and run tests
@@ -128,9 +138,12 @@ git commit -m "feat: Add new feature"
 ## 📋 Documentation Status
 
 ### Completed Documentation
-- ✅ Comprehensive README with quick start guide
+- ✅ Comprehensive README with quick start guide and recent improvements section
 - ✅ Complete API reference with examples and client code
 - ✅ Technical architecture overview with security analysis
+- ✅ **System architecture guide with layered design and data flow diagrams** (January 2025)
+- ✅ **GPG Command Builder pattern API reference and usage guide** (January 2025)
+- ✅ **Refactoring changelog documenting 2025 code quality improvements** (January 2025)
 - ✅ Development guide with setup and contribution instructions
 - ✅ Full code documentation with type hints and docstrings
 

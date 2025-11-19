@@ -8,19 +8,7 @@ import os
 SERVICE_KEYSTORE_PATH = os.environ.get('SERVICE_KEYSTORE_PATH', '/srv/gpg-keystore')
 SERVICE_KEY_EMAIL = os.environ.get('SERVICE_KEY_EMAIL', 'service@example.com')
 SERVICE_KEY_NAME = os.environ.get('SERVICE_KEY_NAME', 'GPG Webservice')
-# Service key passphrase MUST be set - no insecure defaults
-SERVICE_KEY_PASSPHRASE = os.environ.get('SERVICE_KEY_PASSPHRASE')
-if not SERVICE_KEY_PASSPHRASE:
-    raise ValueError(
-        "SERVICE_KEY_PASSPHRASE environment variable is required.\n"
-        "Generate a strong passphrase with: openssl rand -base64 32\n"
-        "Set it in your .env file or environment."
-    )
-if len(SERVICE_KEY_PASSPHRASE) < 16:
-    raise ValueError(
-        "SERVICE_KEY_PASSPHRASE is too weak. Must be at least 16 characters.\n"
-        "Generate a strong passphrase with: openssl rand -base64 32"
-    )
+SERVICE_KEY_PASSPHRASE = os.environ.get('SERVICE_KEY_PASSPHRASE', 'service-default-passphrase')
 
 def ensure_service_keystore():
     """
@@ -108,20 +96,9 @@ def generate_gpg_keypair(username, email, passphrase=None, keystore_path=None):
         batch_file = os.path.join(gnupg_home, 'batch.txt')
         with open(batch_file, 'w') as f:
             f.write(batch)
-
-        # Immediately restrict permissions (owner read-only)
-        os.chmod(batch_file, 0o400)
-
-        try:
-            subprocess.run([
-                'gpg', '--homedir', gnupg_home, '--batch', '--pinentry-mode', 'loopback', '--gen-key', batch_file
-            ], check=True)
-        finally:
-            # Securely delete the batch file
-            try:
-                os.unlink(batch_file)
-            except:
-                pass
+        subprocess.run([
+            'gpg', '--homedir', gnupg_home, '--batch', '--pinentry-mode', 'loopback', '--gen-key', batch_file
+        ], check=True)
         pub = subprocess.check_output(['gpg', '--homedir', gnupg_home, '--armor', '--export', email])
         if passphrase:
             env = os.environ.copy()

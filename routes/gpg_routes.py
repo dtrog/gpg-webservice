@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
 import tempfile
 import os
-import hashlib
 from functools import wraps
 from db.database import db
 from models.user import User
@@ -11,18 +10,11 @@ from services.challenge_service import ChallengeService
 from utils.crypto_utils import decrypt_private_key, derive_gpg_passphrase
 from utils.security_utils import rate_limit_api, validate_file_upload, secure_temp_directory
 from services.auth_service import get_user_by_api_key
-from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file, decrypt_file_with_passphrase
+from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file
 from utils.audit_logger import audit_logger, AuditEventType
 
 # GPG-related routes
 gpg_bp = Blueprint('gpg', __name__)
-
-# Deprecated: Use derive_gpg_passphrase from crypto_utils instead
-def api_key_to_gpg_passphrase(api_key: str) -> str:
-    """Convert API key to a suitable GPG passphrase using SHA256 hash."""
-    import warnings
-    warnings.warn("api_key_to_gpg_passphrase is deprecated, use derive_gpg_passphrase from crypto_utils", DeprecationWarning)
-    return hashlib.sha256(api_key.encode('utf-8')).hexdigest()
 
 # --- API Key Auth Decorator ---
 def require_api_key(f):

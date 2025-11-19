@@ -39,6 +39,6 @@ services:
       - key: MCP_HOST
         value: 0.0.0.0
       - key: GPG_API_BASE
-        value: https://gpg-webservice.onrender.com  # Update with your actual Flask service URL
+        value: "localhost:5555"  # Update with your actual Flask service URL
     healthCheckPath: /health
     autoDeploy: true

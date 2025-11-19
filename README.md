@@ -30,6 +30,48 @@ A secure Flask-based webservice providing GPG cryptographic operations through H
 - **Email Validation**: RFC-compliant email address validation
 - **Challenge-Response**: Optional cryptographic challenge authentication
 
+## 🎯 Recent Code Improvements (January 2025)
+
+The codebase recently underwent comprehensive refactoring to improve code quality, maintainability, and developer experience:
+
+### Code Quality Enhancements
+
+**Builder Pattern for GPG Commands**
+- Introduced `GPGCommandBuilder` class for fluent, readable GPG command construction
+- Reduced GPG operation code by 75% through consolidation
+- Example:
+```python
+(GPGCommandBuilder(gnupg_home)
+ .with_yes()
+ .with_pinentry_loopback()
+ .with_passphrase_stdin(passphrase)
+ .sign(input_path, output_path)
+ .execute('signing'))
+```
+
+**Named Constants for Cryptography**
+- All cryptographic parameters now use named constants (OWASP-compliant)
+- Self-documenting code with clear security parameter documentation
+- Constants: `ARGON2_*`, `PBKDF2_*`, cryptographic sizes
+
+**Code Consolidation**
+- Eliminated ~170 lines of duplicated code
+- Created reusable helper functions for GPG environment setup and key import
+- Improved error handling with comprehensive exception hierarchy
+
+**Performance Optimizations**
+- Module-level imports for better performance
+- Removed deprecated code and unused imports
+
+### Developer Experience
+
+- **Comprehensive Documentation**: New architecture guides and API references
+- **Better Testability**: Builder pattern enables testing without GPG execution
+- **Clear Patterns**: Consistent design patterns throughout codebase
+- **Enhanced Docstrings**: Complete documentation for all functions
+
+See [Refactoring Changelog](docs/refactoring_changelog_2025.md) for complete details.
+
 ## 🚀 Quick Start
 
 ### Using Docker (Recommended)

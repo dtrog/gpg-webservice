@@ -17,12 +17,16 @@ from werkzeug.utils import secure_filename
 from services.auth_service import get_user_by_api_key
 from services.user_service import UserService
 from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file
-from utils.security_utils import rate_limit_api, validate_file_upload
+from utils.security_utils import rate_limit_api, validate_file_upload, validate_username, validate_password, validate_email
 from utils.crypto_utils import derive_gpg_passphrase
 from models.pgp_key import PgpKey, PgpKeyType
 
 # Create blueprint for OpenAI function calling endpoints
 openai_bp = Blueprint('openai', __name__, url_prefix='/openai')
+
+# Maximum text size for operations (1MB)
+MAX_TEXT_SIZE = 1024 * 1024  # 1MB
+MAX_TEXT_SIZE_MB = MAX_TEXT_SIZE / (1024 * 1024)
 
 def require_api_key_json(f):
     """
@@ -88,10 +92,8 @@ def register_user_function():
                 'error': 'username, password, and email are required',
                 'error_code': 'MISSING_FIELDS'
             }), 400
-        
+
         # Validate inputs
-        from utils.security_utils import validate_username, validate_password, validate_email
-        
         username_valid, username_error = validate_username(username)
         if not username_valid:
             return jsonify({
@@ -174,10 +176,18 @@ def sign_text_function(user, raw_api_key):
                 'error': 'text must be a string',
                 'error_code': 'INVALID_TEXT_TYPE'
             }), 400
-            
+
+        # Validate text size
+        if len(text_content) > MAX_TEXT_SIZE:
+            return jsonify({
+                'success': False,
+                'error': f'Text size exceeds maximum of {MAX_TEXT_SIZE_MB:.1f}MB',
+                'error_code': 'TEXT_TOO_LARGE'
+            }), 400
+
         # Get user's private key
         private_key = PgpKey.query.filter_by(
-            user_id=user.id, 
+            user_id=user.id,
             key_type=PgpKeyType.PRIVATE
         ).first()
         
@@ -263,7 +273,15 @@ def verify_text_signature_function(user, raw_api_key):
                 'error': 'text, signature, and public_key are required',
                 'error_code': 'MISSING_FIELDS'
             }), 400
-            
+
+        # Validate text size
+        if len(text_content) > MAX_TEXT_SIZE:
+            return jsonify({
+                'success': False,
+                'error': f'Text size exceeds maximum of {MAX_TEXT_SIZE_MB:.1f}MB',
+                'error_code': 'TEXT_TOO_LARGE'
+            }), 400
+
         # Decode base64 signature data for verification
         try:
             signature_data = base64.b64decode(signature_b64)
@@ -340,7 +358,15 @@ def encrypt_text_function(user, raw_api_key):
                 'error': 'text and recipient_public_key are required',
                 'error_code': 'MISSING_FIELDS'
             }), 400
-            
+
+        # Validate text size
+        if len(text_content) > MAX_TEXT_SIZE:
+            return jsonify({
+                'success': False,
+                'error': f'Text size exceeds maximum of {MAX_TEXT_SIZE_MB:.1f}MB',
+                'error_code': 'TEXT_TOO_LARGE'
+            }), 400
+
         # Create temporary files
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as text_file:
             text_file.write(text_content)
