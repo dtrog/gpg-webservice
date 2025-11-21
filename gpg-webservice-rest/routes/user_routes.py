@@ -1,4 +1,13 @@
 # User-related routes
+"""
+User routes for registration, login, and profile management.
+
+DETERMINISTIC SESSION KEYS:
+- Registration returns a session key (sk_...) valid for 1 hour
+- Login returns a fresh session key for the current time window
+- Session keys are derived mathematically, not stored
+- AI agents can regenerate keys by re-logging in
+"""
 
 from flask import Blueprint
 
@@ -9,37 +18,52 @@ from utils.security_utils import rate_limit_auth, validate_username, validate_pa
 from services.user_service import UserService
 from utils.audit_logger import audit_logger, AuditEventType
 
+
 @user_bp.route('/register', methods=['POST'])
 @rate_limit_auth
 def register():
+    """
+    Register a new user with deterministic session keys.
+
+    The password should be SHA256(successorship_contract + pgp_signature).
+    This allows AI agents to regenerate their password from their immutable contract.
+
+    Returns:
+        - api_key: Derived session key (sk_...) valid for current hour
+        - window_index: Current session window index
+        - expires_at: When the session key expires
+    """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'JSON data required'}), 400
-        
+
     username = data.get('username')
     password = data.get('password')
     email = data.get('email')
-    
+
     # Validate input
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
-    
+
     valid, error = validate_username(username)
     if not valid:
         return jsonify({'error': error}), 400
-    
+
     valid, error = validate_password(password)
     if not valid:
         return jsonify({'error': error}), 400
-    
+
     if email:
         valid, error = validate_email(email)
         if not valid:
             return jsonify({'error': error}), 400
+
     public_key_data = data.get('public_key')  # Optional
     private_key_data = data.get('private_key')  # Optional
+
     user_service = UserService()
     registration_result, error = user_service.register_user(username, password, public_key_data, private_key_data)
+
     if error:
         # Log registration failure
         audit_logger.log_event(
@@ -62,16 +86,32 @@ def register():
     if registration_result.pgp_keypair.public_key:
         public_key = registration_result.pgp_keypair.public_key.key_data
 
+    # Return session key info (derived, not stored)
+    session_info = registration_result.session_key_info
     return jsonify({
-        'message': 'User registered',
+        'message': 'User registered with deterministic session keys',
         'user_id': registration_result.user.id,
-        'api_key': registration_result.api_key,  # Raw API key - only returned once!
-        'public_key': public_key
+        'username': username,
+        'api_key': session_info.api_key,  # Derived session key (sk_...)
+        'session_window': session_info.window_index,
+        'window_start': session_info.window_start,
+        'expires_at': session_info.expires_at,
+        'public_key': public_key,
+        'note': 'Session key expires hourly. Use /login to get a fresh key when expired.'
     }), 201
+
 
 @user_bp.route('/login', methods=['POST'])
 @rate_limit_auth
 def login():
+    """
+    Authenticate user and return a derived session key.
+
+    The session key is deterministically derived from:
+    - HMAC(PBKDF2(password_hash, master_salt), current_hour_index)
+
+    AI agents should call this at the start of each session to get a fresh key.
+    """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'JSON data required'}), 400
@@ -83,30 +123,39 @@ def login():
         return jsonify({'error': 'Username and password are required'}), 400
 
     user_service = UserService()
-    user, pgp_keypair_or_error = user_service.login_user(username, password)
-    if not user:
+    login_result, error = user_service.login_user(username, password)
+
+    if error:
         # Log login failure
         audit_logger.log_event(
             AuditEventType.LOGIN_FAILURE,
             status='failure',
             username=username,
-            message=f'Login failed for {username}'
+            message=f'Login failed for {username}: {error}'
         )
-        return jsonify({'error': pgp_keypair_or_error}), 401
+        return jsonify({'error': error}), 401
 
     # Log successful login
     audit_logger.log_event(
         AuditEventType.LOGIN_SUCCESS,
-        user_id=user.id,
+        user_id=login_result.user.id,
         username=username,
         message=f'User {username} logged in successfully'
     )
 
+    # Return session key info
+    session_info = login_result.session_key_info
     return jsonify({
         'message': 'Login successful',
-        'user_id': user.id
-        # Note: API key is NOT returned on login (only at registration)
+        'user_id': login_result.user.id,
+        'username': username,
+        'api_key': session_info.api_key,  # Derived session key (sk_...)
+        'session_window': session_info.window_index,
+        'window_start': session_info.window_start,
+        'expires_at': session_info.expires_at,
+        'note': 'Session key valid for current hour + 10 min grace period.'
     }), 200
+
 
 @user_bp.route('/register/form', methods=['POST'])
 @rate_limit_auth
@@ -184,17 +233,84 @@ def register_form():
     if registration_result.pgp_keypair.public_key:
         public_key = registration_result.pgp_keypair.public_key.key_data
 
+    # Return session key info
+    session_info = registration_result.session_key_info
     return jsonify({
-        'message': 'User registered successfully',
+        'message': 'User registered successfully with deterministic session keys',
         'user_id': registration_result.user.id,
-        'api_key': registration_result.api_key,  # Raw API key - only returned once!
-        'public_key': public_key
+        'username': username,
+        'api_key': session_info.api_key,
+        'session_window': session_info.window_index,
+        'window_start': session_info.window_start,
+        'expires_at': session_info.expires_at,
+        'public_key': public_key,
+        'note': 'Session key expires hourly. Use /login to get a fresh key when expired.'
     }), 201
 
+
+@user_bp.route('/get_session_key', methods=['POST'])
+@rate_limit_auth
+def get_session_key():
+    """
+    Get current session key with password authentication.
+
+    This is functionally equivalent to /login but named for clarity.
+    AI agents should call this when their session key has expired.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'JSON data required'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+
+    user_service = UserService()
+    login_result, error = user_service.login_user(username, password)
+
+    if error:
+        # Log session key retrieval failure
+        audit_logger.log_event(
+            AuditEventType.LOGIN_FAILURE,
+            status='failure',
+            username=username,
+            message=f'Session key retrieval failed for {username}: {error}'
+        )
+        return jsonify({'error': error}), 401
+
+    # Log session key retrieval
+    audit_logger.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=login_result.user.id,
+        username=username,
+        message=f'Session key retrieved by {username}'
+    )
+
+    session_info = login_result.session_key_info
+    return jsonify({
+        'message': 'Session key retrieved',
+        'user_id': login_result.user.id,
+        'username': username,
+        'api_key': session_info.api_key,
+        'session_window': session_info.window_index,
+        'window_start': session_info.window_start,
+        'expires_at': session_info.expires_at,
+        'note': 'This session key is deterministically derived. You can get the same key by calling /login again within the same hour.'
+    }), 200
+
+
+# LEGACY: Keep for backward compatibility, but redirect to new system
 @user_bp.route('/get_api_key', methods=['POST'])
 @rate_limit_auth
 def get_api_key():
-    """Retrieve API key with password authentication"""
+    """
+    LEGACY: Retrieve API key with password authentication.
+
+    This endpoint now returns a derived session key instead of a stored API key.
+    For backward compatibility, it returns the same format as before.
+    """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'JSON data required'}), 400
@@ -206,40 +322,46 @@ def get_api_key():
         return jsonify({'error': 'Username and password are required'}), 400
 
     user_service = UserService()
-    user, pgp_keypair_or_error = user_service.login_user(username, password)
-    if not user:
-        # Log API key retrieval failure
+    login_result, error = user_service.login_user(username, password)
+
+    if error:
         audit_logger.log_event(
             AuditEventType.LOGIN_FAILURE,
             status='failure',
             username=username,
-            message=f'API key retrieval failed for {username}'
+            message=f'API key retrieval failed for {username}: {error}'
         )
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    # Log API key retrieval
     audit_logger.log_event(
         AuditEventType.LOGIN_SUCCESS,
-        user_id=user.id,
+        user_id=login_result.user.id,
         username=username,
-        message=f'API key retrieved by {username}'
+        message=f'Session key retrieved by {username} (via legacy endpoint)'
     )
 
-    # Return a masked version of the API key hash for security
-    masked_key = f"{user.api_key_hash[:8]}...{user.api_key_hash[-4:]}"
-
+    session_info = login_result.session_key_info
     return jsonify({
-        'message': 'API key retrieved',
-        'user_id': user.id,
+        'message': 'Session key retrieved (deterministic system)',
+        'user_id': login_result.user.id,
         'username': username,
-        'api_key_masked': masked_key,
-        'note': 'For security reasons, the full API key cannot be retrieved. It was only shown once during registration. Use /regenerate_api_key to generate a new one.'
+        'api_key': session_info.api_key,
+        'expires_at': session_info.expires_at,
+        'note': 'API keys are now deterministic session keys that expire hourly. Use /login or /get_session_key to refresh.'
     }), 200
 
+
+# LEGACY: regenerate_api_key is no longer needed with deterministic keys
 @user_bp.route('/regenerate_api_key', methods=['POST'])
 @rate_limit_auth
 def regenerate_api_key():
-    """Regenerate API key with password authentication (for AI agents that lost their key)"""
+    """
+    LEGACY: Regenerate API key.
+
+    With deterministic session keys, this is no longer needed.
+    Session keys are automatically derived from the current time window.
+    Simply call /login to get a fresh session key.
+    """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'JSON data required'}), 400
@@ -250,66 +372,51 @@ def regenerate_api_key():
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
 
-    # Authenticate user
     user_service = UserService()
-    user, pgp_keypair_or_error = user_service.login_user(username, password)
-    if not user:
+    login_result, error = user_service.login_user(username, password)
+
+    if error:
         audit_logger.log_event(
             AuditEventType.LOGIN_FAILURE,
             status='failure',
             username=username,
-            message=f'API key regeneration failed for {username}: invalid credentials'
+            message=f'API key regeneration failed for {username}: {error}'
         )
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    # Generate new API key
-    import secrets
-    import hashlib
-    from db.database import db, session_scope
+    audit_logger.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=login_result.user.id,
+        username=username,
+        message=f'Session key regenerated by {username}'
+    )
 
-    new_api_key = secrets.token_urlsafe(32)
-    new_api_key_hash = hashlib.sha256(new_api_key.encode()).hexdigest()
+    session_info = login_result.session_key_info
+    return jsonify({
+        'message': 'Session key generated (deterministic system)',
+        'user_id': login_result.user.id,
+        'username': username,
+        'api_key': session_info.api_key,
+        'session_window': session_info.window_index,
+        'expires_at': session_info.expires_at,
+        'note': 'With deterministic keys, regeneration is automatic. Simply call /login when your key expires to get a fresh one for the current hour.'
+    }), 200
 
-    # Update user's API key hash
-    try:
-        with session_scope() as session:
-            from models.user import User
-            db_user = session.query(User).filter_by(id=user.id).first()
-            if db_user:
-                db_user.api_key_hash = new_api_key_hash
-                session.commit()
-
-        # Log successful API key regeneration
-        audit_logger.log_event(
-            AuditEventType.LOGIN_SUCCESS,
-            user_id=user.id,
-            username=username,
-            message=f'API key regenerated by {username}'
-        )
-
-        return jsonify({
-            'message': 'API key regenerated successfully',
-            'user_id': user.id,
-            'username': username,
-            'api_key': new_api_key,
-            'warning': 'This is your new API key. The old one is now invalid. Save it securely - it will only be shown once.'
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': f'Failed to regenerate API key: {str(e)}'}), 500
 
 @user_bp.route('/profile', methods=['GET'])
 def get_profile():
-    """Get user profile (requires API key authentication)"""
-    from services.auth_service import get_user_by_api_key
+    """Get user profile (requires session key + username authentication)"""
+    from services.auth_service import authenticate_request
 
     raw_api_key = request.headers.get('X-API-KEY')
-    if not raw_api_key:
-        return jsonify({'error': 'API key required'}), 401
+    username = request.headers.get('X-Username')
 
-    user = get_user_by_api_key(raw_api_key)
+    if not raw_api_key:
+        return jsonify({'error': 'API key required (X-API-KEY header)'}), 401
+
+    user, message = authenticate_request(username, raw_api_key)
     if not user:
-        return jsonify({'error': 'Invalid API key'}), 403
+        return jsonify({'error': message}), 403
 
     # Get user's public key
     from models.pgp_key import PgpKey, PgpKeyType
@@ -319,22 +426,26 @@ def get_profile():
         'user_id': user.id,
         'username': user.username,
         'has_public_key': public_key is not None,
-        'api_key_masked': f"{user.api_key_hash[:8]}...{user.api_key_hash[-4:]}"
+        'uses_deterministic_keys': user.uses_deterministic_keys,
+        'master_salt_preview': f"{user.master_salt[:8]}..." if user.master_salt else None
     }), 200
+
 
 @user_bp.route('/profile', methods=['PUT'])
 def update_profile():
-    """Update user profile (requires API key authentication)"""
-    from services.auth_service import get_user_by_api_key
+    """Update user profile (requires session key + username authentication)"""
+    from services.auth_service import authenticate_request
     from db.database import db
 
     raw_api_key = request.headers.get('X-API-KEY')
-    if not raw_api_key:
-        return jsonify({'error': 'API key required'}), 401
+    username = request.headers.get('X-Username')
 
-    user = get_user_by_api_key(raw_api_key)
+    if not raw_api_key:
+        return jsonify({'error': 'API key required (X-API-KEY header)'}), 401
+
+    user, message = authenticate_request(username, raw_api_key)
     if not user:
-        return jsonify({'error': 'Invalid API key'}), 403
+        return jsonify({'error': message}), 403
 
     data = request.get_json()
     if not data:
@@ -365,23 +476,26 @@ def update_profile():
         'message': 'Profile updated successfully',
         'user_id': user.id,
         'username': user.username,
-        'email': user.email or ''
+        'email': getattr(user, 'email', '') or ''
     }), 200
+
 
 @user_bp.route('/keys/download', methods=['GET'])
 def download_keys():
     """Download user's PGP keys"""
-    from services.auth_service import get_user_by_api_key
+    from services.auth_service import authenticate_request
     from models.pgp_key import PgpKey, PgpKeyType
     from flask import make_response
 
     raw_api_key = request.headers.get('X-API-KEY')
-    if not raw_api_key:
-        return jsonify({'error': 'API key required'}), 401
+    username = request.headers.get('X-Username')
 
-    user = get_user_by_api_key(raw_api_key)
+    if not raw_api_key:
+        return jsonify({'error': 'API key required (X-API-KEY header)'}), 401
+
+    user, message = authenticate_request(username, raw_api_key)
     if not user:
-        return jsonify({'error': 'Invalid API key'}), 403
+        return jsonify({'error': message}), 403
 
     key_type = request.args.get('type', 'public')
 
@@ -403,21 +517,24 @@ def download_keys():
 
     return response
 
+
 @user_bp.route('/keys/upload', methods=['POST'])
 def upload_keys():
     """Upload user's PGP keys (requires password confirmation)"""
-    from services.auth_service import get_user_by_api_key
+    from services.auth_service import authenticate_request
     from models.pgp_key import PgpKey, PgpKeyType
     from db.database import db
     from utils.crypto_utils import encrypt_private_key, derive_gpg_passphrase
 
     raw_api_key = request.headers.get('X-API-KEY')
-    if not raw_api_key:
-        return jsonify({'error': 'API key required'}), 401
+    username_header = request.headers.get('X-Username')
 
-    user = get_user_by_api_key(raw_api_key)
+    if not raw_api_key:
+        return jsonify({'error': 'API key required (X-API-KEY header)'}), 401
+
+    user, message = authenticate_request(username_header, raw_api_key)
     if not user:
-        return jsonify({'error': 'Invalid API key'}), 403
+        return jsonify({'error': message}), 403
 
     # Require password confirmation for security
     password = request.form.get('password')
@@ -426,8 +543,8 @@ def upload_keys():
 
     # Verify password
     user_service = UserService()
-    verified_user, error = user_service.login_user(user.username, password)
-    if not verified_user:
+    verified_result, error = user_service.login_user(user.username, password)
+    if error:
         return jsonify({'error': 'Invalid password'}), 401
 
     # Handle key uploads
@@ -454,7 +571,7 @@ def upload_keys():
 
             # Encrypt private key before storing
             gpg_passphrase = derive_gpg_passphrase(raw_api_key, user.id)
-            encrypted_private_key = encrypt_private_key(private_key_data, gpg_passphrase)
+            encrypted_private_key = encrypt_private_key(private_key_data.encode(), gpg_passphrase)
 
             # Update or create private key
             private_key = PgpKey.query.filter_by(user_id=user.id, key_type=PgpKeyType.PRIVATE).first()

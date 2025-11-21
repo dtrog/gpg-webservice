@@ -1,3 +1,13 @@
+"""
+GPG-related routes for cryptographic operations.
+
+DETERMINISTIC SESSION KEYS:
+- Authentication supports both deterministic session keys (sk_...) and legacy API keys
+- For session keys: Provide X-Username header alongside X-API-KEY
+- Session keys are verified by re-deriving the expected key mathematically
+- Keys expire hourly with 10-minute grace period
+"""
+
 from flask import Blueprint, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
 import tempfile
@@ -9,40 +19,64 @@ from models.pgp_key import PgpKey, PgpKeyType
 from services.challenge_service import ChallengeService
 from utils.crypto_utils import decrypt_private_key, derive_gpg_passphrase
 from utils.security_utils import rate_limit_api, validate_file_upload, secure_temp_directory
-from services.auth_service import get_user_by_api_key
+from services.auth_service import get_user_by_api_key, authenticate_request
 from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file
 from utils.audit_logger import audit_logger, AuditEventType
 
 # GPG-related routes
 gpg_bp = Blueprint('gpg', __name__)
 
+
 # --- API Key Auth Decorator ---
 def require_api_key(f):
+    """
+    Authentication decorator supporting both deterministic session keys and legacy API keys.
+
+    For deterministic session keys (sk_...):
+        - Requires X-Username header
+        - Verifies by re-deriving expected key from user's password_hash and master_salt
+
+    For legacy API keys:
+        - Looks up API key hash in database
+        - No X-Username header required
+
+    Headers:
+        X-API-KEY: The session key (sk_...) or legacy API key (required)
+        X-Username: The username (required for session keys, optional for legacy keys)
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         raw_api_key = request.headers.get('X-API-KEY')
+        username = request.headers.get('X-Username')
+
         if not raw_api_key:
             audit_logger.log_event(
                 AuditEventType.INVALID_API_KEY,
                 status='failure',
                 message='API key missing from request'
             )
-            return jsonify({'error': 'API key required'}), 401
+            return jsonify({'error': 'API key required (X-API-KEY header)'}), 401
 
-        user = get_user_by_api_key(raw_api_key)
+        # Use unified authentication that handles both session keys and legacy keys
+        user, message = authenticate_request(username, raw_api_key)
+
         if not user:
             audit_logger.log_event(
                 AuditEventType.INVALID_API_KEY,
                 status='failure',
-                message='Invalid API key attempted'
+                message=f'Authentication failed: {message}',
+                username=username
             )
-            return jsonify({'error': 'Invalid or inactive API key'}), 403
+            return jsonify({'error': message}), 403
+
+        # Determine authentication method for logging
+        auth_method = 'session_key' if raw_api_key.startswith('sk_') else 'legacy_api_key'
 
         # Log successful authentication
         audit_logger.log_auth_success(
             user_id=user.id,
             username=user.username,
-            method='api_key'
+            method=auth_method
         )
 
         # Pass both user and raw API key to the decorated function

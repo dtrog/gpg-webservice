@@ -178,11 +178,14 @@ def sign(user, raw_api_key):
 **Example**:
 ```python
 def register_user(username, password, email):
-    # Hash password
-    # Generate API key
+    # Hash password (Argon2id)
+    # Generate master_salt (256-bit random)
+    # Create User with master_salt
     # Generate GPG keypair
     # Encrypt private key
     # Save to database
+    # Derive initial session key from password_hash + master_salt
+    # Return session key info (key, window, expiry)
 ```
 
 ---
@@ -222,7 +225,13 @@ def register_user(username, password, email):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    # ... other fields ...
+    password_hash = db.Column(db.String, nullable=False)
+    master_salt = db.Column(db.String, nullable=False)  # For deterministic session keys
+    api_key_hash = db.Column(db.String, nullable=True)  # Legacy, nullable for new users
+
+    @property
+    def uses_deterministic_keys(self) -> bool:
+        return self.master_salt is not None and len(self.master_salt) == 64
 ```
 
 ---
@@ -303,7 +312,7 @@ decrypt_file(input_path, private_key, output_path, passphrase)
 
 ### crypto_utils.py (Recently Refactored)
 
-**Location**: `utils/crypto_utils.py` (153 lines)
+**Location**: `utils/crypto_utils.py`
 
 **Architecture**:
 ```python
@@ -319,6 +328,11 @@ PBKDF2_KEY_LENGTH = 32              # Output length (256 bits)
 SALT_SIZE = 16                      # Salt size (128 bits)
 NONCE_SIZE = 12                     # AES-GCM nonce (96 bits)
 API_KEY_SIZE = 32                   # API key size (256 bits)
+
+# Deterministic Session Key Constants
+MASTER_SALT_SIZE = 32               # Master salt (256 bits)
+SESSION_WINDOW_SECONDS = 3600       # Hourly session windows
+SESSION_GRACE_PERIOD_SECONDS = 600  # 10-minute grace period
 
 # Key Derivation
 derive_key(password, salt) -> bytes
@@ -338,7 +352,7 @@ decrypt_private_key(enc, password) -> bytes
     # AES-GCM decryption
     # Raises InvalidTag on wrong password
 
-# API Key Management
+# Legacy API Key Management
 generate_api_key() -> str
     # Generates 256-bit random key
     # Returns base64url-encoded string
@@ -346,6 +360,30 @@ generate_api_key() -> str
 hash_api_key(api_key) -> str
     # SHA256 hash for database storage
     # One-way hash for secure storage
+
+# Deterministic Session Key Functions
+generate_master_salt() -> str
+    # Generate 256-bit master salt for user
+    # Returns hex-encoded string
+
+derive_master_secret(contract_hash, master_salt) -> bytes
+    # PBKDF2 derivation from password hash and master salt
+    # Returns 32-byte master secret
+
+get_current_session_window() -> int
+    # Returns current hourly window index (Unix timestamp / 3600)
+
+derive_session_key(master_secret, window_index) -> str
+    # HMAC-SHA256 session key for given window
+    # Returns prefixed key: "sk_{base64url_encoded}"
+
+derive_session_key_for_user(contract_hash, master_salt, window_index) -> str
+    # Convenience function combining master secret derivation
+    # and session key derivation
+
+verify_session_key(contract_hash, master_salt, provided_key) -> Tuple[bool, str, str]
+    # Verifies by re-deriving expected key
+    # Checks current window and previous window (grace period)
 ```
 
 **Key Features**:
@@ -553,7 +591,8 @@ def execute(self, operation_name):
                          ↓
 ┌───────────────────────────────────────────────────────────┐
 │ Layer 2: Application Security                             │
-│ - API key authentication (SHA256 hashed in DB)            │
+│ - Deterministic session keys (stateless, hourly rotation) │
+│ - Legacy API key authentication (SHA256 hashed in DB)     │
 │ - Input validation (username, email, file uploads)        │
 │ - File upload restrictions (size, type)                   │
 │ - Reserved username protection                            │
@@ -616,22 +655,30 @@ user_routes.py
     ↓
 UserService.register_user()
     ↓
-┌──────────────────────────────────────┐
-│ 1. Hash password (Argon2id)          │
-│ 2. Create User record                │
-│ 3. Generate API key (256-bit random) │
-│ 4. Hash API key (SHA256)             │
-│ 5. Generate GPG keypair (RSA 3072)   │
-│ 6. Encrypt private key (AES-GCM)     │
-│ 7. Store in database                 │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ 1. Hash password (Argon2id)              │
+│ 2. Generate master_salt (256-bit random) │
+│ 3. Create User record with master_salt   │
+│ 4. Generate GPG keypair (RSA 3072)       │
+│ 5. Encrypt private key (AES-GCM)         │
+│ 6. Store in database                     │
+│ 7. Derive initial session key            │
+│    └─ HMAC(PBKDF2(password_hash,         │
+│            master_salt), window_index)   │
+└──────────────────────────────────────────┘
     ↓
 Return to client
 {
-  "api_key": "...",  ⭐ Only time shown
+  "api_key": "sk_...",     ⭐ Deterministic session key
+  "session_window": 12345,
+  "window_start": "2025-01-01T12:00:00Z",
+  "expires_at": "2025-01-01T13:00:00Z",
   "public_key": "..."
 }
 ```
+
+**Note**: Session keys are not stored in the database. They are derived deterministically
+from the user's password hash and master salt. AI agents can regenerate them by re-logging in.
 
 ---
 
@@ -641,20 +688,30 @@ Return to client
 Client Request
     ↓
 POST /gpg/sign
-Headers: {X-API-KEY: "..."}
+Headers: {X-API-KEY: "sk_...", X-Username: "alice"}
 Body: {file: <binary>}
     ↓
 gpg_routes.py
 ├─ @rate_limit_api (check rate limit)
-└─ @require_api_key (validate API key)
+└─ @require_api_key (authenticate)
        ↓
-   get_user_by_api_key(raw_api_key)
-   ├─ hash_api_key(raw_api_key)
-   └─ Query User by hashed key
+   authenticate_request(username, api_key)
+       ↓
+   ┌─────────────────────────────────────────────────┐
+   │ Session Key Auth (sk_... prefix):               │
+   │ 1. Look up user by username                     │
+   │ 2. Re-derive expected key:                      │
+   │    HMAC(PBKDF2(password_hash, master_salt),     │
+   │         current_window)                         │
+   │ 3. Compare derived key with provided key        │
+   │ 4. If no match, check previous window (grace)   │
+   │                                                 │
+   │ Legacy API Key Auth (no sk_ prefix):            │
+   │ 1. Hash API key with SHA256                     │
+   │ 2. Look up user by api_key_hash in DB           │
+   └─────────────────────────────────────────────────┘
        ↓
    Retrieve encrypted private key from DB
-       ↓
-   decrypt_private_key(encrypted_key, user.password)
        ↓
    derive_gpg_passphrase(raw_api_key, user.id)
        ↓

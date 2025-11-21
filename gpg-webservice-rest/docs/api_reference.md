@@ -4,13 +4,30 @@ This document provides detailed information about all API endpoints, including r
 
 ## Authentication
 
-All cryptographic endpoints require authentication using an API key provided in the request header:
+### Deterministic Session Keys (Recommended for AI Agents)
 
+The API uses **deterministic session keys** that are mathematically derived rather than stored. This design is optimized for AI agents who cannot reliably store secrets.
+
+**How it works:**
+1. Your "password" is the SHA256 hash of your successorship contract + PGP signature
+2. On login, the server derives a session key: `HMAC(PBKDF2(password_hash, master_salt), hour_index)`
+3. Session keys expire every hour with a 10-minute grace period
+4. You can regenerate the same session key by logging in again within the same hour
+
+**Required Headers for Session Keys:**
 ```
-X-API-KEY: your_api_key_here
+X-API-KEY: sk_abc123...     # Derived session key (starts with sk_)
+X-Username: your_username   # Required for stateless verification
 ```
 
-API keys are obtained through user registration or login endpoints. All endpoints are protected by rate limiting:
+**Legacy API Keys (Backward Compatible):**
+```
+X-API-KEY: random_key_here  # Legacy keys don't start with sk_
+```
+
+### Rate Limiting
+
+All endpoints are protected by rate limiting:
 - **Authentication endpoints**: 5 requests per minute per IP
 - **API endpoints**: 30 requests per minute per IP
 
@@ -28,18 +45,23 @@ http://localhost:5000
 
 **`POST /register`**
 
-Creates a new user account with automatic GPG key generation.
+Creates a new user account with automatic GPG key generation and deterministic session keys.
 
 **Request:**
+
 ```json
 {
-  "username": "alice",
-  "password": "SecurePass123!",
-  "email": "alice@example.com"
+  "username": "Overseer_v1",
+  "password": "SHA256_hash_of_contract_plus_signature",
+  "email": "agent@example.com"
 }
 ```
 
+**Password for AI Agents:**
+The password should be `SHA256(successorship_contract + your_pgp_signature)`. This allows agents to regenerate their password from their immutable contract.
+
 **Password Requirements:**
+
 - Minimum 8 characters
 - At least one uppercase letter
 - At least one lowercase letter
@@ -47,16 +69,24 @@ Creates a new user account with automatic GPG key generation.
 - At least one special character (!@#$%^&*(),.?":{}|<>)
 
 **Username Requirements:**
+
 - 3-50 characters
 - Alphanumeric characters, underscores, and hyphens only
 - Reserved usernames (admin, root, etc.) are not allowed
 
 **Response (201 Created):**
+
 ```json
 {
-  "message": "User registered successfully",
-  "api_key": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567",
-  "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----"
+  "message": "User registered with deterministic session keys",
+  "user_id": 1,
+  "username": "Overseer_v1",
+  "api_key": "sk_a1b2c3d4e5f6g7h8i9j0...",
+  "session_window": 481234,
+  "window_start": "2025-11-21T01:00:00+00:00",
+  "expires_at": "2025-11-21T02:10:00+00:00",
+  "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----",
+  "note": "Session key expires hourly. Use /login to get a fresh key when expired."
 }
 ```
 
@@ -84,25 +114,36 @@ curl -X POST http://localhost:5000/register \
 
 **`POST /login`**
 
-Authenticates a user and returns their API key.
+Authenticates a user and returns a derived session key for the current time window.
+
+AI agents should call this endpoint at the start of each session to get a fresh key. The key is deterministically derived, so calling login multiple times within the same hour returns the same key.
 
 **Request:**
+
 ```json
 {
-  "username": "alice",
-  "password": "secure_password123"
+  "username": "Overseer_v1",
+  "password": "SHA256_hash_of_contract_plus_signature"
 }
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "message": "Login successful",
-  "api_key": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567"
+  "user_id": 1,
+  "username": "Overseer_v1",
+  "api_key": "sk_a1b2c3d4e5f6g7h8i9j0...",
+  "session_window": 481234,
+  "window_start": "2025-11-21T01:00:00+00:00",
+  "expires_at": "2025-11-21T02:10:00+00:00",
+  "note": "Session key valid for current hour + 10 min grace period."
 }
 ```
 
 **Response (401 Unauthorized):**
+
 ```json
 {
   "error": "Invalid credentials"
@@ -110,13 +151,48 @@ Authenticates a user and returns their API key.
 ```
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:5000/login \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "alice",
-    "password": "secure_password123"
+    "username": "Overseer_v1",
+    "password": "your_contract_hash"
   }'
+```
+
+---
+
+#### Get Session Key
+
+**`POST /get_session_key`**
+
+Retrieve the current session key (functionally equivalent to `/login`).
+
+AI agents should call this when their session key has expired.
+
+**Request:**
+
+```json
+{
+  "username": "Overseer_v1",
+  "password": "SHA256_hash_of_contract_plus_signature"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Session key retrieved",
+  "user_id": 1,
+  "username": "Overseer_v1",
+  "api_key": "sk_a1b2c3d4e5f6g7h8i9j0...",
+  "session_window": 481234,
+  "window_start": "2025-11-21T01:00:00+00:00",
+  "expires_at": "2025-11-21T02:10:00+00:00",
+  "note": "This session key is deterministically derived. You can get the same key by calling /login again within the same hour."
+}
 ```
 
 ---

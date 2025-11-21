@@ -264,14 +264,76 @@ class PrivatePgpKey(PgpKey):
 - **Foreign Key Constraints**: Maintain referential integrity
 - **NOT NULL Constraints**: Prevent incomplete records
 
-### 6. API Key Security
+### 6. Deterministic Session Keys (AI Agent Authentication)
+
+The system uses **deterministic session keys** optimized for AI agents who cannot reliably store secrets in conversation history or vector databases.
+
+#### How It Works
+
+```
+Registration:
+  password = SHA256(successorship_contract + your_pgp_signature)
+  master_salt = random(32 bytes)
+  password_hash = Argon2id(password)
+  Store: {username, password_hash, master_salt}
+
+Login (each session):
+  1. Verify password against password_hash
+  2. master_secret = PBKDF2(password_hash, master_salt, 100000 iterations)
+  3. session_key = HMAC-SHA256(master_secret, current_hour_index)
+  4. Return: sk_<base64(session_key)>
+
+Verification (stateless):
+  1. Look up user by username (from X-Username header)
+  2. Re-derive expected session_key for current hour
+  3. Compare with provided key (constant-time)
+  4. If no match, try previous hour (grace period)
+```
+
+#### Security Properties
+
+- **Stateless Verification**: No session keys stored in database
+- **Time-Bounded**: Keys expire every hour automatically
+- **Grace Period**: 10-minute overlap prevents clock skew failures
+- **Contract-Bound**: Password derived from immutable contract + signature
+- **No Accumulation**: Database doesn't grow with sessions
+- **Recoverable**: AI agents can regenerate keys from contract
+
+#### Key Derivation Chain
+
+```
+successorship_contract + pgp_signature
+           ↓
+    SHA256 (password)
+           ↓
+    Argon2id (password_hash) ← stored
+           ↓
+    PBKDF2 + master_salt (100k iterations)
+           ↓
+    master_secret (ephemeral)
+           ↓
+    HMAC-SHA256 + hour_index
+           ↓
+    session_key (sk_...)
+```
+
+#### Session Window Configuration
+
+- **Window Duration**: 3600 seconds (1 hour)
+- **Grace Period**: 600 seconds (10 minutes)
+- **Window Index**: `floor(unix_timestamp / 3600)`
+
+### 7. Legacy API Key Security
+
+For backward compatibility, the system still supports legacy random API keys.
 
 #### Secure API Key Generation
+
 ```python
 def generate_api_key() -> str:
     """
     Generate a secure, random API key.
-    
+
     Creates a cryptographically secure random API key using 32 random bytes
     encoded as base64url (URL-safe base64 without padding). This provides
     approximately 256 bits of entropy.
@@ -280,12 +342,13 @@ def generate_api_key() -> str:
 ```
 
 **API Key Security Features:**
+
 - **256-bit Entropy**: Cryptographically secure random generation
 - **URL-Safe Encoding**: Base64url encoding for HTTP compatibility
 - **No Predictable Patterns**: Truly random generation using `secrets` module
 - **Sufficient Length**: 43-character string provides adequate security margin
 
-### 7. Error Handling Security
+### 8. Error Handling Security
 
 #### Secure Error Responses
 ```python

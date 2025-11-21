@@ -31,7 +31,7 @@ This is a **multi-service system** consisting of three components:
 1. **GPG Webservice** (`gpg-webservice-rest/`)
    - Flask REST API for GPG operations
    - Operations: Sign, Verify, Encrypt, Decrypt
-   - User management with API key authentication
+   - Deterministic session key authentication (ideal for AI agents)
    - SQLAlchemy ORM with SQLite/PostgreSQL support
    - **Port**: 5555
 
@@ -281,23 +281,26 @@ python -m pytest tests/ -v
 ### Quick API Test
 
 ```bash
-# 1. Register a user
+# 1. Register a user (returns deterministic session key)
 curl -X POST http://localhost:5555/register \
   -H "Content-Type: application/json" \
   -d '{"username":"testuser","password":"Test123!@#","email":"test@example.com"}'
 
-# Response contains API key
+# Response contains session key (sk_...), session_window, and expires_at
+# Session keys rotate hourly - re-login to get new key when expired
 
-# 2. Sign a file
+# 2. Sign a file (use X-Username with session keys)
 echo "Hello World" > test.txt
 curl -X POST http://localhost:5555/sign \
-  -H "X-API-KEY: <your-api-key>" \
+  -H "X-API-KEY: sk_your_session_key" \
+  -H "X-Username: testuser" \
   -F "file=@test.txt" \
   -o test.txt.sig
 
 # 3. Verify signature
 curl -X POST http://localhost:5555/verify \
-  -H "X-API-KEY: <your-api-key>" \
+  -H "X-API-KEY: sk_your_session_key" \
+  -H "X-Username: testuser" \
   -F "file=@test.txt" \
   -F "signature=@test.txt.sig"
 ```
@@ -386,7 +389,7 @@ See [DEPLOYMENT.md](./gpg-webservice-rest/DEPLOYMENT.md) for detailed production
 
 ## 🔐 Security Features
 
-- **API Key Authentication**: All cryptographic operations require API keys
+- **Deterministic Session Keys**: Stateless authentication ideal for AI agents (hourly rotation)
 - **Argon2id Password Hashing**: OWASP-recommended (4 iterations, 64MB memory)
 - **AES-256-GCM Encryption**: For private key storage
 - **PBKDF2-HMAC-SHA256**: 100,000 iterations for key derivation
@@ -394,6 +397,7 @@ See [DEPLOYMENT.md](./gpg-webservice-rest/DEPLOYMENT.md) for detailed production
 - **Process Isolation**: GPG operations in isolated temporary directories
 - **Input Validation**: Comprehensive validation on all inputs
 - **Security Headers**: HSTS, CSP, X-Frame-Options, etc.
+- **No Secret Storage**: Session keys derived mathematically, not stored in database
 
 ## 🤝 Contributing
 
