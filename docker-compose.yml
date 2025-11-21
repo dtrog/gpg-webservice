@@ -1,6 +1,8 @@
 services:
   gpg-webservice:
     build: .
+    env_file:
+      - .env
     ports:
       - "${FLASK_PORT:-5555}:${FLASK_PORT:-5555}"
     environment:
@@ -9,6 +11,8 @@ services:
       - DATABASE=/app/gpg_users.db
       - PORT=${FLASK_PORT:-5555}
       - HOST=0.0.0.0
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
     volumes:
       - ./gpg_users.db:/app/gpg_users.db
       - /tmp/gpg-docker:/tmp/gnupg
@@ -69,6 +73,7 @@ services:
       - GPG_AGENT_INFO=""
       - GPG_TTY=""
       - DATABASE=/app/test.db
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE:-test-passphrase-for-testing}
     volumes:
       - /tmp/gpg-test:/tmp/gnupg
     networks:

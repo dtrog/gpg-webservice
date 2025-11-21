@@ -17,10 +17,10 @@ docker-compose logs -f
 # Stop
 docker-compose down
 ```
-
+FFE
 ## Custom Ports
 
-```bash
+``                                                               v53E`bash
 # Create .env file
 cat > .env <<EOF
 FLASK_PORT=8000
@@ -129,6 +129,106 @@ docker-compose logs gpg-mcp-server
 docker-compose down
 docker-compose build
 docker-compose up -d
+```
+
+### Docker-Specific Issues
+
+#### Issue: "SERVICE_KEY_PASSPHRASE environment variable is required"
+
+**Root Cause**: Docker container not receiving environment variables from .env file
+
+**Solution Steps**:
+
+1. **Verify .env file exists**:
+   ```bash
+   ls -la .env
+   ```
+
+2. **Generate secrets if missing**:
+   ```bash
+   ./scripts/generate-secrets.sh
+   ```
+
+3. **Verify variable is set** in .env:
+   ```bash
+   grep SERVICE_KEY_PASSPHRASE .env
+   # Should show: SERVICE_KEY_PASSPHRASE=<long-random-string>
+   ```
+
+4. **Check docker-compose.yml** has `env_file`:
+   ```yaml
+   services:
+     gpg-webservice:
+       env_file:
+         - .env     # ← This line should exist
+   ```
+
+5. **Restart with explicit environment loading**:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+6. **Verify container received the variable**:
+   ```bash
+   docker exec gpg-webservice-rest-gpg-webservice-1 env | grep SERVICE_KEY_PASSPHRASE
+   ```
+
+#### Container Builds But Exits Immediately
+
+**Check logs**:
+```bash
+docker logs gpg-webservice-rest-gpg-webservice-1
+```
+
+**Common causes and fixes**:
+
+| Error in Logs | Cause | Fix |
+|---------------|-------|-----|
+| "SERVICE_KEY_PASSPHRASE... required" | Missing env var | Run `./scripts/generate-secrets.sh` |
+| "No such file or directory: '.env'" | Missing .env file | `cp .env.example .env` |
+| "Permission denied" | Volume mount permissions | `chmod 755 gpg_users.db` or delete and recreate |
+| "Port already in use" | Port conflict | Change FLASK_PORT in .env |
+| "ModuleNotFoundError" | Incomplete build | `docker-compose build --no-cache` |
+
+#### Best Practice: Use Root-Level docker-compose.yml
+
+For the complete system with all 3 services (REST API, MCP Server, Dashboard), use the root-level orchestration:
+
+```bash
+# ❌ Don't do this (from gpg-webservice-rest/):
+cd gpg-webservice-rest
+docker-compose up -d
+
+# ✅ Do this (from root):
+cd ..  # Go to /gpg-webservice root
+docker-compose up -d
+```
+
+The root-level `docker-compose.yml` handles:
+- Proper environment variable inheritance
+- All 3 services with correct dependencies
+- Shared networking
+- Service health checks
+
+**Docker Environment Variable Priority**:
+
+Docker Compose loads environment variables in this order (highest priority first):
+
+1. **Environment section** in docker-compose.yml
+2. **env_file** directive
+3. **.env file** in same directory as docker-compose.yml
+4. **Shell environment** variables
+
+Example from root `docker-compose.yml`:
+```yaml
+services:
+  gpg-webservice:
+    env_file:
+      - .env                         # Root .env
+      - ./gpg-webservice-rest/.env   # Service-specific .env
+    environment:
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}  # Explicit pass-through
 ```
 
 ## Next Steps

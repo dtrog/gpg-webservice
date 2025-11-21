@@ -15,6 +15,8 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true  # Render will auto-generate a secure key
+      - key: SERVICE_KEY_PASSPHRASE
+        generateValue: true  # Render will auto-generate a secure passphrase
       - key: DATABASE_URL
         value: sqlite:///gpg_users.db
       - key: OPENAI_API_KEY
