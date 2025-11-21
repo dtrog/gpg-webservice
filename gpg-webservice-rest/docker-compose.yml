@@ -1,0 +1,86 @@
+services:
+  gpg-webservice:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "${FLASK_PORT:-5555}:${FLASK_PORT:-5555}"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - DATABASE=/app/gpg_users.db
+      - PORT=${FLASK_PORT:-5555}
+      - HOST=0.0.0.0
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+    volumes:
+      - ./gpg_users.db:/app/gpg_users.db
+      - /tmp/gpg-docker:/tmp/gnupg
+    networks:
+      - gpg-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${FLASK_PORT:-5555}/openai/function_definitions')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  gpg-mcp-server:
+    build:
+      context: ../gpg-webservice-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "${MCP_PORT:-3000}:${MCP_PORT:-3000}"
+    environment:
+      - GPG_API_BASE=http://gpg-webservice:${FLASK_PORT:-5555}
+      - MCP_PORT=${MCP_PORT:-3000}
+      - MCP_HOST=0.0.0.0
+    depends_on:
+      gpg-webservice:
+        condition: service_healthy
+    networks:
+      - gpg-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${MCP_PORT:-3000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  gpg-dashboard:
+    build:
+      context: ../gpg-webservice-dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    depends_on:
+      gpg-webservice:
+        condition: service_healthy
+    networks:
+      - gpg-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  test-runner:
+    build: .
+    command: python -m pytest tests/test_app.py -v
+    environment:
+      - GNUPGHOME=/tmp/gnupg
+      - GPG_AGENT_INFO=""
+      - GPG_TTY=""
+      - DATABASE=/app/test.db
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE:-test-passphrase-for-testing}
+    volumes:
+      - /tmp/gpg-test:/tmp/gnupg
+    networks:
+      - gpg-network
+    profiles:
+      - test
+
+networks:
+  gpg-network:
+    driver: bridge

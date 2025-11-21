@@ -1,66 +1,37 @@
+# GPG Webservice - Root .gitignore
+# =================================
+
+# Environment files (NEVER commit secrets!)
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.so
-*.egg-info/
-
-# Virtual environments
+*$py.class
+.pytest_cache/
 .venv/
 venv/
 ENV/
 
-# Editor/IDE
-.vscode/
-.idea/
-*.swp
-.DS_Store
-
-# OS
-Thumbs.db
-Desktop.ini
-
-# Test/coverage
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Database and runtime
-instance/
-gpg_users.db
-*.sqlite3
-*.db
-*.log
-*.pid
-
-# Docker
-*.sock
-
-# Misc
-*.bak
-*.orig
-*.tmp
-*.old
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Secrets
-.env
-
-# Build
-build/
-dist/
-.eggs/
-*.manifest
-*.spec
-
-# Node (if any frontend)
+# Node.js
 node_modules/
-
-# Ignore test artifacts
-tests/fixtures/*.asc
-package-lock.json
-gpg-webservice-mcp/package-lock.json
+dist/
+build/

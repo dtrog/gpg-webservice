@@ -1,21 +1,45 @@
+# GPG Webservice Suite - Root Docker Compose
+# ===========================================
+# Orchestrates all three services: REST API, MCP Server, Dashboard
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose logs -f            # View logs
+#   docker-compose ps                 # Check status
+#   docker-compose down               # Stop all services
+#
+# Development mode (with hot-reload):
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+version: '3.8'
+
 services:
+  # =============================================================================
+  # Flask REST API (Primary Service)
+  # =============================================================================
   gpg-webservice:
-    build: .
-    env_file:
-      - .env
+    container_name: gpg-webservice
+    build:
+      context: ./gpg-webservice-rest
+      dockerfile: Dockerfile
     ports:
       - "${FLASK_PORT:-5555}:${FLASK_PORT:-5555}"
+    env_file:
+      - .env
+      - ./gpg-webservice-rest/.env
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - DATABASE=/app/gpg_users.db
+      # Override with root .env values
       - PORT=${FLASK_PORT:-5555}
       - HOST=0.0.0.0
+      - FLASK_ENV=${ENVIRONMENT:-development}
       - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE=/app/gpg_users.db
     volumes:
-      - ./gpg_users.db:/app/gpg_users.db
-      - /tmp/gpg-docker:/tmp/gnupg
+      # Database persistence (SQLite stored in REST API directory)
+      - ./gpg-webservice-rest/gpg_users.db:/app/gpg_users.db
+      # GPG temporary directory
+      - gpg-temp:/tmp/gnupg
     networks:
       - gpg-network
     healthcheck:
@@ -23,18 +47,25 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+    restart: unless-stopped
 
+  # =============================================================================
+  # MCP Server (AI Agent Interface)
+  # =============================================================================
   gpg-mcp-server:
+    container_name: gpg-mcp-server
     build:
-      context: ../gpg-webservice-mcp
+      context: ./gpg-webservice-mcp
       dockerfile: Dockerfile
     ports:
       - "${MCP_PORT:-3000}:${MCP_PORT:-3000}"
+    env_file:
+      - .env
     environment:
-      - GPG_API_BASE=http://gpg-webservice:${FLASK_PORT:-5555}
       - MCP_PORT=${MCP_PORT:-3000}
       - MCP_HOST=0.0.0.0
+      - GPG_API_BASE=${GPG_API_BASE:-http://gpg-webservice:5555}
     depends_on:
       gpg-webservice:
         condition: service_healthy
@@ -46,13 +77,20 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
 
+  # =============================================================================
+  # Dashboard (Web UI)
+  # =============================================================================
   gpg-dashboard:
+    container_name: gpg-dashboard
     build:
-      context: ../gpg-webservice-dashboard
+      context: ./gpg-webservice-dashboard
       dockerfile: Dockerfile
     ports:
       - "${DASHBOARD_PORT:-8080}:80"
+    environment:
+      - API_URL=${API_URL:-http://localhost:5555}
     depends_on:
       gpg-webservice:
         condition: service_healthy
@@ -64,23 +102,48 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
 
+  # =============================================================================
+  # Test Runner (Development/CI)
+  # =============================================================================
   test-runner:
-    build: .
-    command: python -m pytest tests/test_app.py -v
+    container_name: gpg-test-runner
+    build:
+      context: ./gpg-webservice-rest
+      dockerfile: Dockerfile
+    command: python -m pytest tests/ -v
+    env_file:
+      - ./gpg-webservice-rest/.env
     environment:
       - GNUPGHOME=/tmp/gnupg
       - GPG_AGENT_INFO=""
       - GPG_TTY=""
       - DATABASE=/app/test.db
-      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE:-test-passphrase-for-testing}
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE:-test-passphrase}
+      - FLASK_ENV=testing
     volumes:
-      - /tmp/gpg-test:/tmp/gnupg
+      - ./gpg-webservice-rest:/app
+      - gpg-test-temp:/tmp/gnupg
     networks:
       - gpg-network
     profiles:
       - test
 
+# =============================================================================
+# NETWORKS
+# =============================================================================
 networks:
   gpg-network:
     driver: bridge
+    name: gpg-network
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  # GPG temporary directories (cleared on restart)
+  gpg-temp:
+    name: gpg-temp
+  gpg-test-temp:
+    name: gpg-test-temp

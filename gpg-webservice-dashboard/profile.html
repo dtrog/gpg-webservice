@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - GPG Webservice</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Your Profile</h1>
+            <p>Manage your account and PGP keys</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <!-- Profile Information -->
+        <div class="profile-section">
+            <h2>Account Information</h2>
+            <div class="profile-field">
+                <label>Username:</label>
+                <span id="displayUsername">-</span>
+            </div>
+            <div class="profile-field">
+                <label>Email:</label>
+                <input type="email" id="emailInput" style="border: none; background: transparent; font-family: inherit;">
+            </div>
+            <div class="profile-field">
+                <label>User ID:</label>
+                <span id="displayUserId">-</span>
+            </div>
+            <button type="button" class="btn btn-small btn-success" id="updateEmailBtn" style="margin-top: 10px;">
+                Update Email
+            </button>
+        </div>
+
+        <!-- API Key Section -->
+        <div class="profile-section">
+            <h2>API Key</h2>
+            <div class="security-warning">
+                <p><strong>Keep your API key secure!</strong> This key provides access to all your GPG operations.</p>
+            </div>
+            <div class="api-key-display">
+                <input type="password" id="apiKeyDisplay" readonly value="••••••••••••••••••••">
+                <button type="button" class="btn btn-small btn-secondary" id="revealApiKey">Reveal</button>
+                <button type="button" class="btn btn-small btn-success" id="copyApiKey">Copy</button>
+            </div>
+        </div>
+
+        <!-- PGP Keys Section -->
+        <div class="profile-section">
+            <h2>PGP Keys</h2>
+            <div class="profile-field">
+                <label>Public Key:</label>
+                <span id="hasPublicKey">-</span>
+            </div>
+
+            <div class="key-actions">
+                <button type="button" class="btn btn-small btn-secondary" id="downloadPublicKey">
+                    Download Public Key
+                </button>
+                <button type="button" class="btn btn-small btn-secondary" id="downloadPrivateKey">
+                    Download Private Key
+                </button>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e1e8ed;">
+                <h3 style="margin-bottom: 10px;">Upload New Keys</h3>
+                <div class="security-warning">
+                    <p>Uploading new keys will replace your existing keys. This action requires password confirmation.</p>
+                </div>
+
+                <form id="uploadKeysForm">
+                    <div class="form-group">
+                        <label for="password">Confirm Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Public Key (optional)</label>
+                        <label for="publicKeyFile" class="file-upload-btn" id="publicKeyLabel">
+                            Choose Public Key File
+                        </label>
+                        <input type="file" id="publicKeyFile" name="public_key_file" accept=".asc,.txt,.pem">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Private Key (optional)</label>
+                        <label for="privateKeyFile" class="file-upload-btn" id="privateKeyLabel">
+                            Choose Private Key File
+                        </label>
+                        <input type="file" id="privateKeyFile" name="private_key_file" accept=".asc,.txt,.pem">
+                    </div>
+
+                    <button type="submit" class="btn btn-success" id="uploadBtn">
+                        Upload Keys
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-links">
+            <a href="/swagger-ui">API Documentation</a>
+            <a href="/" >Home</a>
+            <a href="#" id="logoutLink" style="color: #dc3545;">Logout</a>
+        </div>
+    </div>
+
+    <!-- Reveal API Key Modal -->
+    <div id="revealModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+        <div class="container" style="max-width: 500px;">
+            <div class="header">
+                <h1>Reveal API Key</h1>
+                <p>Enter your password to reveal your API key</p>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong>⚠️ Security:</strong> Make sure no one is looking at your screen!
+            </div>
+
+            <form id="revealForm">
+                <div class="form-group">
+                    <label for="revealPassword">Password</label>
+                    <input type="password" id="revealPassword" required>
+                </div>
+
+                <div class="form-group hidden" id="revealedKeySection">
+                    <label>Your API Key:</label>
+                    <input type="text" id="revealedKey" readonly>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-success">Reveal</button>
+                    <button type="button" class="btn btn-secondary" id="closeRevealModal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Check if API key is in sessionStorage
+        const apiKey = sessionStorage.getItem('gpg_api_key');
+        if (!apiKey) {
+            showAlert('Please login first', 'warning');
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 2000);
+        }
+
+        // Load profile data
+        async function loadProfile() {
+            try {
+                const response = await fetch(API_BASE + '/profile', {
+                    headers: {
+                        'X-API-KEY': apiKey
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('displayUsername').textContent = data.username;
+                    document.getElementById('emailInput').value = data.email || '';
+                    document.getElementById('displayUserId').textContent = data.user_id;
+                    document.getElementById('hasPublicKey').textContent = data.has_public_key ? 'Yes' : 'No';
+                    document.getElementById('apiKeyDisplay').value = apiKey;
+                } else {
+                    showAlert(data.error || 'Failed to load profile', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        loadProfile();
+
+        // Update email
+        document.getElementById('updateEmailBtn').addEventListener('click', async () => {
+            const email = document.getElementById('emailInput').value;
+
+            try {
+                const response = await fetch(API_BASE + '/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'X-API-KEY': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Email updated successfully', 'success');
+                } else {
+                    showAlert(data.error || 'Failed to update email', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        });
+
+        // Reveal API key
+        const revealModal = document.getElementById('revealModal');
+        document.getElementById('revealApiKey').addEventListener('click', () => {
+            revealModal.classList.remove('hidden');
+            revealModal.style.display = 'flex';
+        });
+
+        document.getElementById('closeRevealModal').addEventListener('click', () => {
+            revealModal.classList.add('hidden');
+            revealModal.style.display = 'none';
+            document.getElementById('revealedKeySection').classList.add('hidden');
+        });
+
+        document.getElementById('revealForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            // In production, verify password with backend
+            document.getElementById('revealedKey').value = apiKey;
+            document.getElementById('revealedKeySection').classList.remove('hidden');
+        });
+
+        // Copy API key
+        document.getElementById('copyApiKey').addEventListener('click', () => {
+            navigator.clipboard.writeText(apiKey).then(() => {
+                const btn = document.getElementById('copyApiKey');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        });
+
+        // Download keys
+        document.getElementById('downloadPublicKey').addEventListener('click', async () => {
+            try {
+                const response = await fetch(API_BASE + '/keys/download?type=public', {
+                    headers: {
+                        'X-API-KEY': apiKey
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'public_key.asc';
+                    a.click();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || 'Failed to download public key', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        });
+
+        document.getElementById('downloadPrivateKey').addEventListener('click', async () => {
+            if (!confirm('Warning: Downloading your private key. Keep it secure!')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE + '/keys/download?type=private', {
+                    headers: {
+                        'X-API-KEY': apiKey
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'private_key.asc';
+                    a.click();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || 'Failed to download private key', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        });
+
+        // File upload handling
+        document.getElementById('publicKeyFile').addEventListener('change', function(e) {
+            const label = document.getElementById('publicKeyLabel');
+            if (e.target.files.length > 0) {
+                label.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = 'Choose Public Key File';
+                label.classList.remove('has-file');
+            }
+        });
+
+        document.getElementById('privateKeyFile').addEventListener('change', function(e) {
+            const label = document.getElementById('privateKeyLabel');
+            if (e.target.files.length > 0) {
+                label.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = 'Choose Private Key File';
+                label.classList.remove('has-file');
+            }
+        });
+
+        // Upload keys form
+        document.getElementById('uploadKeysForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            formData.append('api_key', apiKey);
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="loading"></span> Uploading...';
+
+            try {
+                const response = await fetch(API_BASE + '/keys/upload', {
+                    method: 'POST',
+                    headers: {
+                        'X-API-KEY': apiKey
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Keys uploaded successfully: ' + data.updated_keys.join(', '), 'success');
+                    loadProfile(); // Reload profile
+                } else {
+                    showAlert(data.error || 'Failed to upload keys', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Keys';
+            }
+        });
+
+        // Logout
+        document.getElementById('logoutLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            sessionStorage.removeItem('gpg_api_key');
+            window.location.href = 'login.html';
+        });
+    </script>
+</body>
+</html>

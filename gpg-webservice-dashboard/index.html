@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPG Webservice Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 GPG Webservice</h1>
+            <p>Secure GPG operations via REST API</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <p style="color: #666; margin-bottom: 30px;">
+                A Flask-based webservice providing cryptographic operations (signing, verification, encryption, decryption)
+                with automatic GPG key management and secure storage.
+            </p>
+
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <a href="register.html" style="text-decoration: none;">
+                    <button class="btn" style="width: 200px;">
+                        Get Started
+                    </button>
+                </a>
+                <a href="login.html" style="text-decoration: none;">
+                    <button class="btn btn-secondary" style="width: 200px;">
+                        Login
+                    </button>
+                </a>
+            </div>
+        </div>
+
+        <div class="profile-section" style="margin-top: 40px;">
+            <h2>Features</h2>
+            <ul style="list-style: none; padding: 0;">
+                <li style="padding: 10px 0; border-bottom: 1px solid #e1e8ed;">
+                    ✓ <strong>User Registration</strong> - Automatic GPG keypair generation
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e1e8ed;">
+                    ✓ <strong>API Key Authentication</strong> - Secure access control
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e1e8ed;">
+                    ✓ <strong>File Operations</strong> - Sign, verify, encrypt, decrypt files
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e1e8ed;">
+                    ✓ <strong>Key Management</strong> - Upload/download PGP keys
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e1e8ed;">
+                    ✓ <strong>OpenAI Integration</strong> - Function calling compatible
+                </li>
+                <li style="padding: 10px 0;">
+                    ✓ <strong>MCP Protocol</strong> - Model Context Protocol support
+                </li>
+            </ul>
+        </div>
+
+        <div class="nav-links" style="margin-top: 40px;">
+            <a href="/swagger-ui">API Documentation</a>
+            <a href="https://github.com/damientrog/gpg-webservice" target="_blank">GitHub</a>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e1e8ed;">
+            <p style="color: #999; font-size: 0.85rem;">
+                Built with Flask, SQLAlchemy, and GPG
+            </p>
+        </div>
+    </div>
+</body>
+</html>

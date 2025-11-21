@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - GPG Webservice</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome Back</h1>
+            <p>Login to GPG Webservice</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                Login
+            </button>
+        </form>
+
+        <a href="register.html" class="link">Don't have an account? Register</a>
+        <a href="#" class="link" id="forgotApiKey">Forgot your API key?</a>
+
+        <div class="nav-links">
+            <a href="/swagger-ui">API Documentation</a>
+            <a href="/">Home</a>
+        </div>
+    </div>
+
+    <!-- Forgot API Key Modal -->
+    <div id="apiKeyRetrievalModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+        <div class="container" style="max-width: 500px;">
+            <div class="header">
+                <h1>API Key Information</h1>
+                <p>API keys are masked for security</p>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>Note:</strong> For security reasons, the full API key cannot be retrieved. It was only shown once during registration. If lost, you must re-register.
+            </div>
+
+            <div id="maskedKeyDisplay" class="hidden">
+                <div class="form-group">
+                    <label>Your Masked API Key:</label>
+                    <input type="text" id="maskedApiKey" readonly>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-secondary" id="closeModal">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        const form = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const forgotApiKeyLink = document.getElementById('forgotApiKey');
+        const apiKeyRetrievalModal = document.getElementById('apiKeyRetrievalModal');
+        const closeModal = document.getElementById('closeModal');
+        const maskedKeyDisplay = document.getElementById('maskedKeyDisplay');
+        const maskedApiKey = document.getElementById('maskedApiKey');
+
+        // Login form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span> Logging in...';
+
+            try {
+                const response = await fetch(API_BASE + '/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Now get API key using the same credentials
+                    const apiKeyResponse = await fetch(API_BASE + '/get_api_key', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const apiKeyData = await apiKeyResponse.json();
+
+                    if (apiKeyResponse.ok) {
+                        // Store masked API key for informational purposes
+                        // In a real app, we'd need to get the actual API key somehow
+                        // For now, we'll show a message that they need to use the key from registration
+                        showAlert('Login successful! Note: You need to use the API key provided during registration.', 'success');
+
+                        // Redirect to profile page after a delay
+                        setTimeout(() => {
+                            // Since we don't have the actual API key, redirect to a holding page
+                            // In production, this would require modification to store API key securely
+                            showAlert('Please enter your API key to continue to your profile.', 'warning');
+                        }, 2000);
+                    } else {
+                        showAlert('Login successful, but API key info unavailable.', 'warning');
+                    }
+                } else {
+                    showAlert(data.error || 'Login failed', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Login';
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+        });
+
+        // Forgot API key link
+        forgotApiKeyLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showAlert('Please enter your username and password first', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE + '/get_api_key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    maskedApiKey.value = data.api_key_masked;
+                    maskedKeyDisplay.classList.remove('hidden');
+                    apiKeyRetrievalModal.classList.remove('hidden');
+                    apiKeyRetrievalModal.style.display = 'flex';
+                } else {
+                    showAlert(data.error || 'Failed to retrieve API key', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        });
+
+        // Close modal
+        closeModal.addEventListener('click', () => {
+            apiKeyRetrievalModal.classList.add('hidden');
+            apiKeyRetrievalModal.style.display = 'none';
+        });
+
+        // Modified login to store API key in session
+        // Note: This is a simplified version for demo purposes
+        // In production, you'd want more secure session management
+    </script>
+</body>
+</html>

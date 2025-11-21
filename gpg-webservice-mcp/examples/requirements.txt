@@ -1,0 +1,2 @@
+# Requirements for OpenAI Agent SDK examples
+openai-agents

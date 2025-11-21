@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - GPG Webservice</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Create Account</h1>
+            <p>Register for GPG Webservice</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" required
+                       minlength="3" maxlength="50"
+                       pattern="[a-zA-Z0-9_-]+"
+                       title="3-50 characters, letters, numbers, underscore, hyphen only">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" name="password" required
+                       minlength="8"
+                       title="Minimum 8 characters, must include uppercase, lowercase, digit, and special character">
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password *</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required>
+            </div>
+
+            <div class="optional-section">
+                <h3>Optional: Provide Existing PGP Keys</h3>
+                <p style="color: #666; font-size: 0.85rem; margin-bottom: 15px;">
+                    If you already have PGP keys, you can upload them. Otherwise, keys will be generated automatically.
+                </p>
+
+                <div class="form-group">
+                    <label>Public Key (optional)</label>
+                    <label for="publicKeyFile" class="file-upload-btn" id="publicKeyLabel">
+                        Choose File or Click to Upload
+                    </label>
+                    <input type="file" id="publicKeyFile" name="public_key_file" accept=".asc,.txt,.pem">
+                    <textarea id="publicKeyText" name="public_key_text"
+                              placeholder="Or paste your ASCII-armored public key here..."
+                              style="margin-top: 10px;"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Private Key (optional)</label>
+                    <label for="privateKeyFile" class="file-upload-btn" id="privateKeyLabel">
+                        Choose File or Click to Upload
+                    </label>
+                    <input type="file" id="privateKeyFile" name="private_key_file" accept=".asc,.txt,.pem">
+                    <textarea id="privateKeyText" name="private_key_text"
+                              placeholder="Or paste your ASCII-armored private key here..."
+                              style="margin-top: 10px;"></textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                Register
+            </button>
+        </form>
+
+        <a href="login.html" class="link">Already have an account? Login</a>
+        <div class="nav-links">
+            <a href="/swagger-ui">API Documentation</a>
+            <a href="/">Home</a>
+        </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div id="apiKeyModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;">
+        <div class="container" style="max-width: 500px;">
+            <div class="header">
+                <h1>Registration Successful!</h1>
+                <p>Save your API key now - it won't be shown again</p>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong>⚠️ Important:</strong> Copy and store your API key securely. You will not be able to retrieve it later!
+            </div>
+
+            <div class="form-group">
+                <label>Your API Key:</label>
+                <div class="api-key-display">
+                    <input type="text" id="apiKeyDisplay" readonly style="flex: 1;">
+                    <button type="button" class="btn btn-small btn-success" id="copyApiKey">Copy</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="confirmSaved" style="width: auto; margin-right: 10px;">
+                    I have saved my API key securely
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button type="button" class="btn" id="continueBtn" disabled style="flex: 1;">
+                    Go to Profile
+                </button>
+                <button type="button" class="btn btn-secondary" id="goToLoginBtn" disabled style="flex: 1;">
+                    Go to Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Registration-specific JavaScript
+        const form = document.getElementById('registerForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const apiKeyModal = document.getElementById('apiKeyModal');
+        const apiKeyDisplay = document.getElementById('apiKeyDisplay');
+        const copyApiKey = document.getElementById('copyApiKey');
+        const confirmSaved = document.getElementById('confirmSaved');
+        const continueBtn = document.getElementById('continueBtn');
+        const goToLoginBtn = document.getElementById('goToLoginBtn');
+
+        // File upload handling
+        document.getElementById('publicKeyFile').addEventListener('change', function(e) {
+            const label = document.getElementById('publicKeyLabel');
+            if (e.target.files.length > 0) {
+                label.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = 'Choose File or Click to Upload';
+                label.classList.remove('has-file');
+            }
+        });
+
+        document.getElementById('privateKeyFile').addEventListener('change', function(e) {
+            const label = document.getElementById('privateKeyLabel');
+            if (e.target.files.length > 0) {
+                label.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = 'Choose File or Click to Upload';
+                label.classList.remove('has-file');
+            }
+        });
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (password !== confirmPassword) {
+                showAlert('Passwords do not match', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span> Registering...';
+
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch(API_BASE + '/register/form', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show API key modal
+                    apiKeyDisplay.value = data.api_key;
+                    apiKeyModal.style.display = 'flex';
+
+                    // Store API key temporarily for profile access
+                    sessionStorage.setItem('gpg_api_key', data.api_key);
+                } else {
+                    showAlert(data.error || 'Registration failed', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Register';
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register';
+            }
+        });
+
+        // Copy API key
+        copyApiKey.addEventListener('click', async () => {
+            try {
+                // Try modern clipboard API first
+                await navigator.clipboard.writeText(apiKeyDisplay.value);
+                copyApiKey.textContent = '✓ Copied!';
+                copyApiKey.classList.remove('btn-success');
+                copyApiKey.classList.add('btn-primary');
+            } catch (err) {
+                // Fallback to older method
+                apiKeyDisplay.select();
+                apiKeyDisplay.setSelectionRange(0, 99999); // For mobile
+                try {
+                    document.execCommand('copy');
+                    copyApiKey.textContent = '✓ Copied!';
+                } catch (e) {
+                    copyApiKey.textContent = 'Failed';
+                    console.error('Copy failed:', e);
+                }
+            }
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                copyApiKey.textContent = 'Copy';
+                copyApiKey.classList.remove('btn-primary');
+                copyApiKey.classList.add('btn-success');
+            }, 2000);
+        });
+
+        // Enable continue buttons
+        confirmSaved.addEventListener('change', () => {
+            continueBtn.disabled = !confirmSaved.checked;
+            goToLoginBtn.disabled = !confirmSaved.checked;
+        });
+
+        // Go to profile (recommended - API key already stored)
+        continueBtn.addEventListener('click', () => {
+            window.location.href = 'profile.html';
+        });
+
+        // Go to login (alternative)
+        goToLoginBtn.addEventListener('click', () => {
+            window.location.href = 'login.html';
+        });
+    </script>
+</body>
+</html>
