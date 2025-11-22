@@ -20,14 +20,27 @@ config_class = get_config()
 app.config.from_object(config_class)
 
 # Initialize CORS
-CORS(app, resources={
-    r"/*": {
-        "origins": ["http://localhost:8080", "http://localhost:5555"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "X-API-KEY"],
-        "expose_headers": ["Content-Disposition"]
-    }
-})
+# Allow all origins for flexibility (can be restricted in production via environment variable)
+allowed_origins = os.environ.get('CORS_ORIGINS', '*')
+if allowed_origins == '*':
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "X-API-KEY", "X-Username"],
+            "expose_headers": ["Content-Disposition"]
+        }
+    })
+else:
+    origins_list = [origin.strip() for origin in allowed_origins.split(',')]
+    CORS(app, resources={
+        r"/*": {
+            "origins": origins_list,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "X-API-KEY", "X-Username"],
+            "expose_headers": ["Content-Disposition"]
+        }
+    })
 
 # Initialize database
 init_db(app)
