@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.1.0",
   "info": {
     "title": "GPG Webservice API",
     "version": "1.0.0",
@@ -10,12 +10,8 @@
   },
   "servers": [
     {
-      "url": "http://51.210.109.137:5555",
+      "url": "https://51.210.109.137:5555",
       "description": "Production server"
-    },
-    {
-      "url": "http://localhost:5555",
-      "description": "Local development server"
     }
   ],
   "tags": [
@@ -1060,6 +1056,7 @@
     },
     "/openai/register_user": {
       "post": {
+        "operationId": "registerUser",
         "tags": ["OpenAI Integration"],
         "summary": "Register user (OpenAI-compatible)",
         "description": "Register a new user - OpenAI function calling compatible endpoint",
@@ -1115,6 +1112,7 @@
     },
     "/openai/sign_text": {
       "post": {
+        "operationId": "signText",
         "tags": ["OpenAI Integration"],
         "summary": "Sign text (OpenAI-compatible)",
         "description": "Sign text content and return base64-encoded signature",
@@ -1155,6 +1153,7 @@
     },
     "/openai/verify_text_signature": {
       "post": {
+        "operationId": "verifyTextSignature",
         "tags": ["OpenAI Integration"],
         "summary": "Verify text signature (OpenAI-compatible)",
         "description": "Verify a text signature against a public key",
@@ -1203,6 +1202,7 @@
     },
     "/openai/encrypt_text": {
       "post": {
+        "operationId": "encryptText",
         "tags": ["OpenAI Integration"],
         "summary": "Encrypt text (OpenAI-compatible)",
         "description": "Encrypt text for a recipient and return base64-encoded result",
@@ -1247,6 +1247,7 @@
     },
     "/openai/decrypt_text": {
       "post": {
+        "operationId": "decryptText",
         "tags": ["OpenAI Integration"],
         "summary": "Decrypt text (OpenAI-compatible)",
         "description": "Decrypt base64-encoded encrypted text",
@@ -1288,6 +1289,7 @@
     },
     "/openai/get_user_public_key": {
       "post": {
+        "operationId": "getUserPublicKey",
         "tags": ["OpenAI Integration"],
         "summary": "Get public key (OpenAI-compatible)",
         "description": "Get the authenticated user's public key",
