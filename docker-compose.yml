@@ -38,6 +38,7 @@ services:
       - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE=/app/gpg_users.db
+      - ADMIN_USERNAMES=${ADMIN_USERNAMES:-}
     volumes:
       # Database persistence (SQLite stored in REST API directory)
       - ./gpg-webservice-rest/gpg_users.db:/app/gpg_users.db

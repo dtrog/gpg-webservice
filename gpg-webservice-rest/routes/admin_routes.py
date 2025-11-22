@@ -4,10 +4,18 @@ from functools import wraps
 from db.database import get_session
 from models.user import User
 import logging
+import os
 
 admin_bp = Blueprint('admin', __name__)
 logger = logging.getLogger(__name__)
 
+# Get admin usernames from environment variable (comma-separated)
+# Example: ADMIN_USERNAMES="alice,bob,administrator"
+ADMIN_USERNAMES = set(
+    username.strip() 
+    for username in os.environ.get('ADMIN_USERNAMES', '').split(',') 
+    if username.strip()
+)
 
 def require_admin(f):
     """Decorator to require admin authentication via API key."""
@@ -25,6 +33,25 @@ def require_admin(f):
             
             if not user:
                 return jsonify({'error': 'Invalid API key'}), 403
+            
+            # Check if user is an admin
+            if not ADMIN_USERNAMES:
+                logger.warning(
+                    "No admin usernames configured. "
+                    "Set ADMIN_USERNAMES environment variable."
+                )
+                return jsonify({
+                    'error': 'Admin access not configured'
+                }), 403
+            
+            if user.username not in ADMIN_USERNAMES:
+                logger.warning(
+                    f"User {user.username} attempted admin action "
+                    f"but is not in admin list"
+                )
+                return jsonify({
+                    'error': 'Admin access required'
+                }), 403
             
             # Store username for logging
             request.admin_username = user.username

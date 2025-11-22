@@ -106,17 +106,39 @@ const API_BASE = 'https://localhost';
 
 **Access**: `/admin.html`
 
-Features:
-- **List All Users** - View all registered users
-- **Delete User** - Remove individual users (requires your session key)
-- **Bulk Delete** - Delete multiple users at once (one username per line)
+**⚠️ IMPORTANT: Admin Access Control**
 
-**Authentication**: Any registered user can access admin functions. The session key is used to verify you're authenticated.
+Admin functions require proper authorization. To designate admin users:
+
+1. **Set the `ADMIN_USERNAMES` environment variable** (comma-separated list):
+   ```bash
+   export ADMIN_USERNAMES="alice,bob,administrator"
+   ```
+
+2. **In docker-compose**, add to `.env` file:
+   ```bash
+   ADMIN_USERNAMES=alice,bob,administrator
+   ```
+
+3. **Restart the REST API service**:
+   ```bash
+   docker compose restart gpg-webservice-rest
+   ```
+
+**Without setting `ADMIN_USERNAMES`, admin endpoints will return 403 Forbidden.**
+
+Features:
+- **List All Users** - View all registered users (no auth required)
+- **Delete User** - Remove individual users (requires admin session key)
+- **Bulk Delete** - Delete multiple users at once (requires admin session key)
+
+**Authentication**: Only users listed in `ADMIN_USERNAMES` can perform delete operations.
 
 **Usage**:
-1. Register or login to get your session key
-2. Navigate to `/admin.html`
-3. Use your session key (starts with `sk_`) for delete operations
+1. Register with a username listed in `ADMIN_USERNAMES`
+2. Login to get your session key (starts with `sk_`)
+3. Navigate to `/admin.html`
+4. Use your session key for delete operations
 
 ## Security
 
