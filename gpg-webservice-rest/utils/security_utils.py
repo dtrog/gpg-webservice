@@ -135,8 +135,8 @@ def validate_username(username: str) -> Tuple[bool, Optional[str]]:
     if not re.match(r'^[a-zA-Z0-9_-]+$', username):
         return False, "Username can only contain letters, numbers, underscores, and hyphens"
     
-    # Prevent reserved usernames
-    reserved = {'admin', 'root', 'administrator', 'system', 'test', 'null', 'undefined'}
+    # Prevent reserved usernames (administrator allowed for admin access)
+    reserved = {'admin', 'root', 'system', 'test', 'null', 'undefined'}
     if username.lower() in reserved:
         return False, "Username is reserved and cannot be used"
     

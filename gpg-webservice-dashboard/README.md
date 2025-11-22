@@ -79,7 +79,7 @@ const API_BASE = 'https://localhost';
 
 1. Visit `/register.html`
 2. Fill in username, email, password
-3. **Important**: Avoid reserved usernames: `admin`, `root`, `administrator`, `system`, `test`, `null`, `undefined`
+3. **Important**: Avoid reserved usernames: `admin`, `root`, `system`, `test`, `null`, `undefined`
 4. Optionally upload existing PGP keys
 5. Submit form
 6. **Important**: Copy and save the session key (starts with `sk_`, expires hourly!)
@@ -148,7 +148,7 @@ Features:
 - HTTPS required for production (via Caddy reverse proxy)
 - CSP headers configured in nginx
 - All API communication uses secure headers
-- **Reserved usernames**: Cannot use `admin`, `root`, `administrator`, `system`, `test`, `null`, `undefined`
+- **Reserved usernames**: Cannot use `admin`, `root`, `system`, `test`, `null`, `undefined`
 
 ## Deployment
 
