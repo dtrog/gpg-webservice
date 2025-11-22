@@ -11,17 +11,19 @@ function getApiBase() {
         return 'http://localhost:5555';
     }
     
-    // Production with nginx proxy on port 8080
-    if (port === '8080') {
-        return window.location.protocol + '//' + hostname + ':8080/api';
-    }
-    
-    // Production: Direct connection to Flask on port 5555
-    // This handles cases where dashboard is on 8080 but API is on 5555
+    // Production: Always use port 5555 for API (Flask backend)
+    // The dashboard runs on 8080 (nginx), but API is on 5555
     return window.location.protocol + '//' + hostname + ':5555';
 }
 
 const API_BASE = getApiBase();
+
+console.log('[GPG Dashboard] Environment:', {
+    hostname: window.location.hostname,
+    port: window.location.port,
+    protocol: window.location.protocol,
+    apiBase: API_BASE
+});
 
 // Utility function to show alerts
 function showAlert(message, type = 'info') {
