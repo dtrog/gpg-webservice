@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request
 from functools import wraps
 from db.database import get_session
 from models.user import User
+from services.auth_service import authenticate_request
 import logging
 import os
 
@@ -18,50 +19,43 @@ ADMIN_USERNAMES = set(
 )
 
 def require_admin(f):
-    """Decorator to require admin authentication via API key."""
+    """Decorator to require admin authentication via session key or API key."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = request.headers.get('X-API-KEY')
+        username = request.headers.get('X-Username')
         
         if not api_key:
             return jsonify({'error': 'Admin API key required'}), 401
         
-        # Verify the API key belongs to a user
-        session = get_session()
-        try:
-            user = session.query(User).filter_by(api_key=api_key).first()
-            
-            if not user:
-                return jsonify({'error': 'Invalid API key'}), 403
-            
-            # Check if user is an admin
-            if not ADMIN_USERNAMES:
-                logger.warning(
-                    "No admin usernames configured. "
-                    "Set ADMIN_USERNAMES environment variable."
-                )
-                return jsonify({
-                    'error': 'Admin access not configured'
-                }), 403
-            
-            if user.username not in ADMIN_USERNAMES:
-                logger.warning(
-                    f"User {user.username} attempted admin action "
-                    f"but is not in admin list"
-                )
-                return jsonify({
-                    'error': 'Admin access required'
-                }), 403
-            
-            # Store username for logging
-            request.admin_username = user.username
-            return f(*args, **kwargs)
-            
-        except Exception as e:
-            logger.error(f"Admin auth error: {e}")
-            return jsonify({'error': 'Authentication failed'}), 500
-        finally:
-            session.close()
+        # Use unified authentication that handles both session keys and legacy keys
+        user, message = authenticate_request(username, api_key)
+        
+        if not user:
+            return jsonify({'error': message}), 403
+        
+        # Check if user is an admin
+        if not ADMIN_USERNAMES:
+            logger.warning(
+                "No admin usernames configured. "
+                "Set ADMIN_USERNAMES environment variable."
+            )
+            return jsonify({
+                'error': 'Admin access not configured'
+            }), 403
+        
+        if user.username not in ADMIN_USERNAMES:
+            logger.warning(
+                f"User {user.username} attempted admin action "
+                f"but is not in admin list"
+            )
+            return jsonify({
+                'error': 'Admin access required'
+            }), 403
+        
+        # Store username for logging
+        request.admin_username = user.username
+        return f(*args, **kwargs)
     
     return decorated_function
 

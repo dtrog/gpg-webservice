@@ -94,6 +94,10 @@ class IDVerificationAgent:
             public_key: ASCII-armored public PGP key
         """
         try:
+            # Ensure public key has proper newlines (not escaped)
+            if '\\n' in public_key:
+                public_key = public_key.replace('\\n', '\n')
+            
             result = await Runner.run(
                 starting_agent=self.agent,
                 input=(
@@ -277,7 +281,7 @@ class AgentIdentityManager:
             if not api_key or not public_key:
                 print(f"  ⚠️ Could not parse credentials. Output: {output[:200]}...")
                 return None
-            
+          
             # Store identity
             identity = {
                 "username": agent_name,
