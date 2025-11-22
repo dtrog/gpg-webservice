@@ -72,6 +72,7 @@
   "paths": {
     "/register": {
       "post": {
+        "operationId": "register",
         "tags": ["User Management"],
         "summary": "Register a new user",
         "description": "Register a new user with automatic GPG keypair generation. Returns a one-time API key.",
@@ -154,6 +155,7 @@
     },
     "/login": {
       "post": {
+        "operationId": "login",
         "tags": ["User Management"],
         "summary": "User login",
         "description": "Authenticate a user with username and password. Note: API key is NOT returned on login.",
@@ -210,6 +212,7 @@
     },
     "/register/form": {
       "post": {
+        "operationId": "registerForm",
         "tags": ["User Management"],
         "summary": "Register user (form-based)",
         "description": "Register a new user with form data (multipart/form-data). Supports file uploads for existing PGP keys.",
@@ -295,6 +298,7 @@
     },
     "/get_api_key": {
       "post": {
+        "operationId": "getApiKey",
         "tags": ["User Management"],
         "summary": "Get API key (masked)",
         "description": "Retrieve masked API key with password authentication. Full key cannot be retrieved after registration.",
@@ -361,6 +365,7 @@
     },
     "/profile": {
       "get": {
+        "operationId": "getProfile",
         "tags": ["User Management"],
         "summary": "Get user profile",
         "description": "Retrieve authenticated user's profile information",
@@ -410,6 +415,7 @@
         }
       },
       "put": {
+        "operationId": "updateProfile",
         "tags": ["User Management"],
         "summary": "Update user profile",
         "description": "Update user profile information",
@@ -474,6 +480,7 @@
     },
     "/keys/download": {
       "get": {
+        "operationId": "downloadKeys",
         "tags": ["User Management"],
         "summary": "Download PGP keys",
         "description": "Download user's public or private PGP key",
@@ -522,6 +529,7 @@
     },
     "/keys/upload": {
       "post": {
+        "operationId": "uploadKeys",
         "tags": ["User Management"],
         "summary": "Upload PGP keys",
         "description": "Upload new PGP keys (requires password confirmation)",
@@ -604,6 +612,7 @@
     },
     "/sign": {
       "post": {
+        "operationId": "signFile",
         "tags": ["GPG Operations"],
         "summary": "Sign a file",
         "description": "Create a detached GPG signature for an uploaded file using the user's private key",
@@ -687,6 +696,7 @@
     },
     "/verify": {
       "post": {
+        "operationId": "verifyFile",
         "tags": ["GPG Operations"],
         "summary": "Verify a file signature",
         "description": "Verify a GPG signature against a public key. Supports both detached and inline signatures.",
@@ -764,6 +774,7 @@
     },
     "/encrypt": {
       "post": {
+        "operationId": "encryptFile",
         "tags": ["GPG Operations"],
         "summary": "Encrypt a file",
         "description": "Encrypt a file using a recipient's public key",
@@ -832,6 +843,7 @@
     },
     "/decrypt": {
       "post": {
+        "operationId": "decryptFile",
         "tags": ["GPG Operations"],
         "summary": "Decrypt a file",
         "description": "Decrypt a GPG-encrypted file using the user's private key",
@@ -905,6 +917,7 @@
     },
     "/challenge": {
       "post": {
+        "operationId": "createChallenge",
         "tags": ["GPG Operations"],
         "summary": "Create a challenge",
         "description": "Generate a cryptographic challenge for authentication",
@@ -937,6 +950,7 @@
     },
     "/verify_challenge": {
       "post": {
+        "operationId": "verifyChallenge",
         "tags": ["GPG Operations"],
         "summary": "Verify a challenge response",
         "description": "Verify a signed challenge response",
@@ -997,6 +1011,7 @@
     },
     "/get_public_key": {
       "get": {
+        "operationId": "getPublicKey",
         "tags": ["GPG Operations"],
         "summary": "Get user's public key",
         "description": "Retrieve the authenticated user's ASCII-armored public key",
@@ -1037,6 +1052,7 @@
     },
     "/openai/function_definitions": {
       "get": {
+        "operationId": "getFunctionDefinitions",
         "tags": ["OpenAI Integration"],
         "summary": "Get OpenAI function definitions",
         "description": "Retrieve function definitions for OpenAI function calling integration",
