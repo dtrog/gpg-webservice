@@ -15,6 +15,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
 import type {
@@ -270,6 +271,15 @@ export function createApp(
   configApiKey?: string
 ): express.Express {
   const app = express();
+  
+  // Enable CORS for all routes
+  app.use(cors({
+    origin: '*', // Allow all origins for development
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-API-KEY'],
+    credentials: true
+  }));
+  
   app.use(express.json());
 
   // Health check endpoint
