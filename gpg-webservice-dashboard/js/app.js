@@ -1,9 +1,10 @@
 // GPG Webservice Dashboard - Shared JavaScript
 
 // API Configuration
+// Use nginx proxy in production, direct connection in development
 const API_BASE = window.location.hostname === 'localhost'
     ? 'http://localhost:5555'
-    : window.location.origin;
+    : window.location.origin + '/api';
 
 // Utility function to show alerts
 function showAlert(message, type = 'info') {
