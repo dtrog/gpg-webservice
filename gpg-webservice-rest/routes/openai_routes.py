@@ -84,12 +84,12 @@ def register_user_function():
             
         username = data.get('username')
         password = data.get('password')
-        email = data.get('email')
+        email = data.get('email')  # Optional for AI agents
         
-        if not all([username, password, email]):
+        if not all([username, password]):
             return jsonify({
                 'success': False,
-                'error': 'username, password, and email are required',
+                'error': 'username and password are required',
                 'error_code': 'MISSING_FIELDS'
             }), 400
 
@@ -110,27 +110,32 @@ def register_user_function():
                 'error_code': 'INVALID_PASSWORD'
             }), 400
             
-        email_valid, email_error = validate_email(email)
-        if not email_valid:
-            return jsonify({
-                'success': False,
-                'error': email_error,
-                'error_code': 'INVALID_EMAIL'
-            }), 400
+        # Validate email only if provided
+        if email:
+            email_valid, email_error = validate_email(email)
+            if not email_valid:
+                return jsonify({
+                    'success': False,
+                    'error': email_error,
+                    'error_code': 'INVALID_EMAIL'
+                }), 400
             
         user_service = UserService()
         registration_result, error = user_service.register_user(username, password)
 
         if registration_result:
+            session_info = registration_result.session_key_info
             return jsonify({
                 'success': True,
                 'data': {
                     'user_id': registration_result.user.id,
                     'username': registration_result.user.username,
-                    'api_key': registration_result.api_key,
-                    'public_key': registration_result.pgp_keypair.public_key
+                    'api_key': session_info.api_key,
+                    'session_window': session_info.window_index,
+                    'expires_at': session_info.expires_at,
+                    'public_key': registration_result.pgp_keypair.public_key.key_data if registration_result.pgp_keypair.public_key else None
                 },
-                'message': 'User registered successfully'
+                'message': 'User registered successfully with deterministic session key'
             }), 201
         else:
             return jsonify({
@@ -143,6 +148,70 @@ def register_user_function():
         return jsonify({
             'success': False,
             'error': f'Registration failed: {str(e)}',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
+@openai_bp.route('/login', methods=['POST'])
+@rate_limit_api
+def login_function():
+    """
+    OpenAI Function: Login and retrieve a session key (API key).
+    
+    Expected input format:
+    {
+        "username": "string",
+        "password": "string"
+    }
+    
+    Returns the current session key for the user.
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'JSON data required',
+                'error_code': 'INVALID_INPUT'
+            }), 400
+            
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not all([username, password]):
+            return jsonify({
+                'success': False,
+                'error': 'username and password are required',
+                'error_code': 'MISSING_FIELDS'
+            }), 400
+            
+        user_service = UserService()
+        login_result, error = user_service.login_user(username, password)
+
+        if login_result:
+            session_info = login_result.session_key_info
+            return jsonify({
+                'success': True,
+                'data': {
+                    'user_id': login_result.user.id,
+                    'username': login_result.user.username,
+                    'api_key': session_info.api_key,
+                    'session_window': session_info.window_index,
+                    'expires_at': session_info.expires_at
+                },
+                'message': 'Login successful - use api_key for subsequent requests'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': error or 'Invalid credentials',
+                'error_code': 'LOGIN_FAILED'
+            }), 401
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Login failed: {str(e)}',
             'error_code': 'INTERNAL_ERROR'
         }), 500
 
@@ -542,6 +611,24 @@ def get_function_definitions():
     """
     functions = [
         {
+            "name": "login",
+            "description": "Login to retrieve your API key (session key) - required before using other functions",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "username": {
+                        "type": "string",
+                        "description": "Your username"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "Your password"
+                    }
+                },
+                "required": ["username", "password"]
+            }
+        },
+        {
             "name": "register_user",
             "description": "Register a new user account with automatic GPG key generation",
             "parameters": {
@@ -560,11 +647,11 @@ def get_function_definitions():
                     },
                     "email": {
                         "type": "string",
-                        "description": "Valid email address",
+                        "description": "Valid email address (optional for AI agents)",
                         "format": "email"
                     }
                 },
-                "required": ["username", "password", "email"]
+                "required": ["username", "password"]
             }
         },
         {

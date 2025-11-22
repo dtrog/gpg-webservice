@@ -1,2 +1,3 @@
 # Requirements for OpenAI Agent SDK examples
 openai-agents
+openai-agents-mcp

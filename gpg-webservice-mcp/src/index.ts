@@ -16,6 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
+import { resolve } from 'path';
 import type {
   FunctionDefinition,
   FunctionDefinitionsResponse,
@@ -23,8 +24,8 @@ import type {
   MCPConfig,
 } from './types.js';
 
-// Load environment variables
-config();
+// Load environment variables from .env file in the project root
+config({ path: resolve(process.cwd(), '.env') });
 
 /**
  * Get configuration from environment variables

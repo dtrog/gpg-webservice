@@ -1,4 +1,6 @@
-from openai_agents import Agent
+from openai.agents import Agent
+from openai.agents.mcp import MCPServerStreamableHttp
+
 # Assuming we have wrapper tools for your GPG Service and Ontology
 from my_tools import gpg_tool, ontology_tool, audit_trail_tool
 

@@ -493,7 +493,7 @@ No code changes needed in the adapter when the Flask service is updated.
 
 ### Testing
 
-Test the server manually:
+#### Testing Locally (without Docker)
 
 1. Start the Flask GPG webservice
 2. Start the MCP server with `npm run dev`
@@ -504,6 +504,89 @@ Example with `@modelcontextprotocol/inspector`:
 ```bash
 npm install -g @modelcontextprotocol/inspector
 mcp-inspector node dist/index.js
+```
+
+#### Testing with Docker
+
+When running services via Docker Compose, you can test the MCP server in several ways:
+
+> **Note:** The Docker container runs the HTTP transport (`http-server.js`) by default, not the stdio transport. The `mcp-inspector` tool requires stdio transport, so it won't work directly with the Dockerized version. Instead, use the methods below to test the HTTP-based deployment.
+
+**Method 1: Test Flask API Endpoints Directly**
+
+The easiest way to test the Docker deployment:
+
+```bash
+# Start all services
+docker compose up -d
+
+# Check MCP server is running
+curl http://localhost:3000/health
+
+# List available function definitions
+curl http://localhost:5555/openai/function_definitions | jq
+
+# Register a test user
+curl -X POST http://localhost:5555/openai/register_user \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"TestPass123!"}'
+
+# Login to get an API key
+curl -X POST http://localhost:5555/openai/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"TestPass123!"}'
+
+# Use the API key for signing text
+curl -X POST http://localhost:5555/openai/sign_text \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key-here" \
+  -d '{"text":"Hello, World!"}'
+```
+
+**Method 2: Test via HTTP Transport**
+
+If using the HTTP transport (`http-server.ts`), you can test directly:
+
+```bash
+# Start services
+docker compose up -d
+
+# Test health endpoint
+curl http://localhost:3000/health
+
+# Use the MCP endpoint with any HTTP client
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+**Method 3: Test from Host Machine**
+
+Connect to the Dockerized services from your host:
+
+```bash
+# Install inspector globally on host
+npm install -g @modelcontextprotocol/inspector
+
+# Build MCP locally to test against Dockerized REST API
+cd gpg-webservice-mcp
+npm run build
+
+# Update .env to point to Docker service
+# GPG_API_BASE=http://localhost:5555
+
+# Run inspector
+mcp-inspector node dist/index.js
+```
+
+**Method 4: View MCP Server Logs**
+
+```bash
+# View real-time logs
+docker logs -f gpg-webservice-mcp
+
+# Check if server started successfully
+docker logs gpg-webservice-mcp | grep "MCP Server started"
 ```
 
 ## Troubleshooting

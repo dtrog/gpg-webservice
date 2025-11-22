@@ -161,22 +161,21 @@ export function formatMCPResponse(flaskResponse: FlaskResponse): {
     // Success response with both text and structured data
     const message = flaskResponse.message || 'Operation completed successfully';
 
-    const content: Array<{ type: string; text?: string; data?: any }> = [
-      {
-        type: 'text',
-        text: message,
-      }
-    ];
+    let textContent = message;
 
-    // Add structured data if present
+    // Add structured data as JSON text if present
     if (flaskResponse.data) {
-      content.push({
-        type: 'resource',
-        data: flaskResponse.data
-      });
+      textContent += '\n\n' + JSON.stringify(flaskResponse.data, null, 2);
     }
 
-    return { content };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: textContent,
+        }
+      ]
+    };
   } else {
     // Error response
     const errorMessage =

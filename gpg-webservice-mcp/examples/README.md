@@ -1,6 +1,23 @@
 # OpenAI Agent SDK Examples
 
-This directory contains example scripts demonstrating how to use the GPG Webservice MCP server with OpenAI's Agent SDK.
+This directory contains **optimized** example scripts demonstrating how to use the GPG Webservice MCP server with OpenAI's Agent SDK for complex workflows.
+
+## 🎯 Quick Start
+
+1. **Simple Test** (verifies connectivity):
+   ```bash
+   python simple_test.py
+   ```
+
+2. **Basic Workflow** (login → sign → verify):
+   ```bash
+   python openai_agent_example.py
+   ```
+
+3. **Advanced Workflows** (multi-user, error recovery):
+   ```bash
+   python advanced_workflow_example.py
+   ```
 
 ## Prerequisites
 
@@ -11,18 +28,20 @@ This directory contains example scripts demonstrating how to use the GPG Webserv
    export OPENAI_API_KEY=your-openai-api-key-here
    ```
 
-3. **MCP HTTP Server Running**
+3. **GPG Webservice Running (with Docker)**
    ```bash
-   # In the parent directory
-   npm run build
-   npm run start:http
+   # In the root directory of the project
+   docker-compose up -d
    ```
-   Server should be running at `http://localhost:3000/mcp`
+   This starts all three services:
+   - REST API: `http://localhost:5555`
+   - MCP Server: `http://localhost:3000/mcp`
+   - Dashboard: `http://localhost:8080`
 
-4. **Flask GPG Webservice Running**
+   Verify MCP is running:
    ```bash
-   # The backend GPG service should be running at http://localhost:5000
-   # See the main GPG webservice repository for setup
+   curl http://localhost:3000/health
+   # Should return: {"status":"healthy",...,"tools_loaded":7}
    ```
 
 ## Installation
@@ -36,7 +55,8 @@ pip install -r requirements.txt
 Or install directly:
 
 ```bash
-pip install openai-agents-sdk
+pip install openai-agents
+pip install openai-agents-mcp
 ```
 
 ## Running the Examples
@@ -74,9 +94,129 @@ API Key: gpg_abc123... (save this securely!)
 
 ## Available Examples
 
-| File | Description |
-|------|-------------|
-| `openai_agent_example.py` | Basic usage: register, sign, verify |
+| File | Purpose | Complexity | Best For |
+|------|---------|------------|----------|
+| `simple_test.py` | Connectivity test | ⭐ Simple | Debugging, validation |
+| `openai_agent_example.py` | **Standard workflow** | ⭐⭐ Moderate | Production basic workflows |
+| `streamlined_example.py` | Ultra-reliable workflow | ⭐⭐ Moderate | Critical production workflows |
+| `advanced_workflow_example.py` | Complex scenarios | ⭐⭐⭐ Advanced | Learning, multi-user workflows |
+
+## 📚 Documentation
+
+- **[WORKFLOW_BEST_PRACTICES.md](WORKFLOW_BEST_PRACTICES.md)** - Complete guide to building reliable workflows
+- **[OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md)** - What we optimized and why
+- **[IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md)** - Technical implementation details
+
+## Example Descriptions
+
+### `simple_test.py` - Basic Connectivity Test
+
+**Purpose**: Verify MCP server connectivity with minimal complexity
+
+**What it does**:
+- Connects to MCP server
+- Performs single login operation
+- Validates response
+
+**Use when**:
+- Testing MCP server setup
+- Debugging connection issues
+- Validating environment configuration
+
+```bash
+python simple_test.py
+```
+
+Expected: "Login successful. You can now perform GPG operations..."
+
+### `openai_agent_example.py` - Standard Workflow (OPTIMIZED)
+
+**Purpose**: Production-ready 3-step workflow with best practices
+
+**What it does**:
+1. Login or register user (with login-first pattern)
+2. Sign a message using stored API key
+3. Verify the signature
+
+**Optimizations**:
+- ✅ Explicit memory management instructions
+- ✅ Error recovery guidance
+- ✅ 20 turn limit (increased from 15)
+- ✅ Turn usage monitoring
+- ✅ Clear step-by-step workflow
+
+**Use when**:
+- Building standard GPG workflows
+- Need reliable 3-5 step workflows
+- Template for new agent implementations
+
+```bash
+python openai_agent_example.py
+```
+
+**Key Features**:
+- Login-first pattern (avoids database pollution)
+- Context retention across operations
+- Comprehensive error handling
+- Execution statistics
+
+### `streamlined_example.py` - Ultra-Reliable Workflow (NEW)
+
+**Purpose**: Maximum reliability through extreme explicitness
+
+**What it does**:
+- Same as standard workflow but with explicit state tracking
+- Forces agent to confirm storage of all credentials
+- Requires status updates after each step
+
+**Special Features**:
+- State storage format: `"STORED: NAME = value"`
+- Step completion confirmations
+- Success indicator analysis
+- Higher turn budget (20)
+
+**Use when**:
+- Production critical workflows
+- Debugging context loss issues
+- Need guaranteed state retention
+- Maximum reliability required
+
+```bash
+python streamlined_example.py
+```
+
+### `advanced_workflow_example.py` - Complex Scenarios (NEW)
+
+**Purpose**: Demonstrate advanced patterns and multi-user workflows
+
+**Includes 3 workflows**:
+
+1. **Two-Party Encryption** (25 turns)
+   - Setup Alice and Bob
+   - Alice encrypts message for Bob
+   - Bob decrypts the message
+   
+2. **Signature Chain** (30 turns)
+   - Multiple users sign same document
+   - Creates audit trail
+   - Verifies all signatures
+
+3. **Error Recovery Demo** (20 turns)
+   - Tests error scenarios
+   - Demonstrates recovery patterns
+   - Shows resilience strategies
+
+**Use when**:
+- Learning complex workflow patterns
+- Building multi-user systems
+- Need error recovery examples
+- Researching workflow optimization
+
+```bash
+python advanced_workflow_example.py
+```
+
+## Available Examples
 
 ## Creating Your Own Agent
 
@@ -84,8 +224,8 @@ Here's a minimal template:
 
 ```python
 import asyncio
-from openai_agents_sdk import Agent
-from openai_agents_sdk.mcp import MCPServerStreamableHttp
+from agents import Agent
+from agents.mcp import MCPServerStreamableHttp
 
 async def main():
     async with MCPServerStreamableHttp(
