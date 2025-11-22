@@ -30,7 +30,7 @@ config();
 /**
  * Get configuration from environment variables
  */
-function getConfig(): MCPConfig & { port: number; host: string } {
+export function getConfig(): MCPConfig & { port: number; host: string } {
   const gpgApiBase = process.env.GPG_API_BASE || 'http://localhost:5000';
   const gpgApiKey = process.env.GPG_API_KEY;
   const port = parseInt(process.env.MCP_PORT || '3000', 10);
@@ -92,7 +92,7 @@ async function fetchFunctionDefinitions(
 /**
  * Convert Flask function definition to MCP tool definition
  */
-function convertToMCPTool(func: FunctionDefinition): Tool {
+export function convertToMCPTool(func: FunctionDefinition): Tool {
   return {
     name: func.name,
     description: func.description,
@@ -153,7 +153,7 @@ async function callFlaskEndpoint(
  * Format Flask response for MCP client
  * Returns both human-readable text and structured JSON content
  */
-function formatMCPResponse(flaskResponse: FlaskResponse): {
+export function formatMCPResponse(flaskResponse: FlaskResponse): {
   content: Array<{ type: string; text?: string; data?: any }>;
   isError?: boolean;
 } {
@@ -263,31 +263,13 @@ function createMCPServer(
 }
 
 /**
- * Main HTTP server setup
+ * Create Express app with routes (exported for testing)
  */
-async function main() {
-  const appConfig = getConfig();
-
-  console.log('Starting GPG Webservice MCP Server (HTTP Transport)...');
-  console.log(`API Base URL (initial): ${appConfig.gpgApiBase}`);
-  console.log(`API Key: ${appConfig.gpgApiKey ? '***configured***' : 'not configured'}`);
-  console.log(`HTTP Server: ${appConfig.host}:${appConfig.port}`);
-
-  // Fetch function definitions on startup
-  let functionDefinitions: FunctionDefinition[];
-  let actualBaseUrl: string;
-  try {
-    const result = await fetchFunctionDefinitions(appConfig.gpgApiBase);
-    functionDefinitions = result.functions;
-    actualBaseUrl = result.baseUrl;
-    console.log(`Loaded ${functionDefinitions.length} function definitions`);
-    console.log(`Using base URL from Flask: ${actualBaseUrl}`);
-  } catch (error) {
-    console.error('Failed to load function definitions. Exiting.');
-    process.exit(1);
-  }
-
-  // Create Express app
+export function createApp(
+  functionDefinitions: FunctionDefinition[],
+  actualBaseUrl: string,
+  configApiKey?: string
+): express.Express {
   const app = express();
   app.use(express.json());
 
@@ -309,7 +291,7 @@ async function main() {
       const server = createMCPServer(
         functionDefinitions,
         actualBaseUrl,
-        appConfig.gpgApiKey
+        configApiKey
       );
 
       // Create a new transport for this request to prevent ID collisions
@@ -339,6 +321,37 @@ async function main() {
     }
   });
 
+  return app;
+}
+
+/**
+ * Main HTTP server setup
+ */
+async function main() {
+  const appConfig = getConfig();
+
+  console.log('Starting GPG Webservice MCP Server (HTTP Transport)...');
+  console.log(`API Base URL (initial): ${appConfig.gpgApiBase}`);
+  console.log(`API Key: ${appConfig.gpgApiKey ? '***configured***' : 'not configured'}`);
+  console.log(`HTTP Server: ${appConfig.host}:${appConfig.port}`);
+
+  // Fetch function definitions on startup
+  let functionDefinitions: FunctionDefinition[];
+  let actualBaseUrl: string;
+  try {
+    const result = await fetchFunctionDefinitions(appConfig.gpgApiBase);
+    functionDefinitions = result.functions;
+    actualBaseUrl = result.baseUrl;
+    console.log(`Loaded ${functionDefinitions.length} function definitions`);
+    console.log(`Using base URL from Flask: ${actualBaseUrl}`);
+  } catch (error) {
+    console.error('Failed to load function definitions. Exiting.');
+    process.exit(1);
+  }
+
+  // Create and configure app
+  const app = createApp(functionDefinitions, actualBaseUrl, appConfig.gpgApiKey);
+
   // Start HTTP server
   app.listen(appConfig.port, appConfig.host, () => {
     console.log(`\nGPG Webservice MCP Server listening on http://${appConfig.host}:${appConfig.port}`);
@@ -348,8 +361,13 @@ async function main() {
   });
 }
 
-// Run the server
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Run the server only when executed directly (not when imported for testing)
+const isMainModule = process.argv[1]?.endsWith('http-server.js') ||
+                     process.argv[1]?.endsWith('http-server.ts');
+
+if (isMainModule) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

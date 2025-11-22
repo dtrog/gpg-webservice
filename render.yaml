@@ -1,11 +1,12 @@
 services:
-  # Flask GPG Webservice
+  # Flask GPG Webservice (REST API)
   - type: web
-    name: gpg-webservice
+    name: gpg-webservice-rest
     runtime: docker
     region: frankfurt
     plan: free
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./gpg-webservice-rest/Dockerfile
+    dockerContext: ./gpg-webservice-rest
     envVars:
       - key: PORT
         value: 5555  # Render uses PORT environment variable
@@ -30,17 +31,21 @@ services:
 
   # MCP HTTP Server (Optional - deploy if you need MCP/AI agent access)
   - type: web
-    name: gpg-mcp-server
+    name: gpg-webservice-mcp
     runtime: docker
     region: frankfurt
     plan: free
     dockerfilePath: ./gpg-webservice-mcp/Dockerfile
+    dockerContext: ./gpg-webservice-mcp
     envVars:
       - key: MCP_PORT
         value: 3000
       - key: MCP_HOST
         value: 0.0.0.0
       - key: GPG_API_BASE
-        value: "localhost:5555"  # Update with your actual Flask service URL
+        fromService:
+          name: gpg-webservice-rest
+          type: web
+          property: hostport
     healthCheckPath: /health
     autoDeploy: true

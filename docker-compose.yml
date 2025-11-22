@@ -1,24 +1,27 @@
-# GPG Webservice Suite - Root Docker Compose
-# ===========================================
-# Orchestrates all three services: REST API, MCP Server, Dashboard
+# GPG Webservice Suite - Docker Compose
+# ======================================
+# Parent project with 3 subprojects:
+#   - gpg-webservice-rest      (REST API - Required)
+#   - gpg-webservice-mcp       (MCP Server - Optional)
+#   - gpg-webservice-dashboard (Web UI - Optional)
 #
 # Usage:
-#   docker-compose up -d              # Start all services
-#   docker-compose logs -f            # View logs
-#   docker-compose ps                 # Check status
-#   docker-compose down               # Stop all services
+#   docker compose up -d                           # Start all services
+#   docker compose up -d gpg-webservice-rest       # Start only REST API
+#   docker compose up -d gpg-webservice-rest gpg-webservice-mcp  # REST + MCP
+#   docker compose logs -f                         # View logs
+#   docker compose ps                              # Check status
+#   docker compose down                            # Stop all services
 #
 # Development mode (with hot-reload):
-#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-
-version: '3.8'
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 services:
   # =============================================================================
-  # Flask REST API (Primary Service)
+  # Flask REST API (Core Service - Required)
   # =============================================================================
-  gpg-webservice:
-    container_name: gpg-webservice
+  gpg-webservice-rest:
+    container_name: gpg-webservice-rest
     build:
       context: ./gpg-webservice-rest
       dockerfile: Dockerfile
@@ -51,10 +54,10 @@ services:
     restart: unless-stopped
 
   # =============================================================================
-  # MCP Server (AI Agent Interface)
+  # MCP Server (AI Agent Interface - Optional)
   # =============================================================================
-  gpg-mcp-server:
-    container_name: gpg-mcp-server
+  gpg-webservice-mcp:
+    container_name: gpg-webservice-mcp
     build:
       context: ./gpg-webservice-mcp
       dockerfile: Dockerfile
@@ -65,9 +68,9 @@ services:
     environment:
       - MCP_PORT=${MCP_PORT:-3000}
       - MCP_HOST=0.0.0.0
-      - GPG_API_BASE=${GPG_API_BASE:-http://gpg-webservice:5555}
+      - GPG_API_BASE=http://gpg-webservice-rest:5555
     depends_on:
-      gpg-webservice:
+      gpg-webservice-rest:
         condition: service_healthy
     networks:
       - gpg-network
@@ -80,10 +83,10 @@ services:
     restart: unless-stopped
 
   # =============================================================================
-  # Dashboard (Web UI)
+  # Dashboard (Web UI - Optional)
   # =============================================================================
-  gpg-dashboard:
-    container_name: gpg-dashboard
+  gpg-webservice-dashboard:
+    container_name: gpg-webservice-dashboard
     build:
       context: ./gpg-webservice-dashboard
       dockerfile: Dockerfile
@@ -92,7 +95,7 @@ services:
     environment:
       - API_URL=${API_URL:-http://localhost:5555}
     depends_on:
-      gpg-webservice:
+      gpg-webservice-rest:
         condition: service_healthy
     networks:
       - gpg-network
