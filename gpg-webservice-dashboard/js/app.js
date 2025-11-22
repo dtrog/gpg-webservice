@@ -11,8 +11,12 @@ function getApiBase() {
         return 'http://localhost:5555';
     }
     
-    // Production: Always use port 5555 for API (Flask backend)
-    // The dashboard runs on 8080 (nginx), but API is on 5555
+    // Production via domain (Caddy handles routing): no port needed
+    if (port === '' || port === '443' || port === '80') {
+        return window.location.protocol + '//' + hostname;
+    }
+    
+    // Production via direct port access (8080): use explicit Flask port
     return window.location.protocol + '//' + hostname + ':5555';
 }
 
