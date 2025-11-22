@@ -212,31 +212,30 @@
             resultDiv.innerHTML = '<div class="alert alert-info">Testing MCP server connection...</div>';
             
             try {
-                // Test SSE endpoint (MCP uses Server-Sent Events)
-                const response = await fetch(MCP_BASE + '/sse', {
+                // Test health endpoint
+                const response = await fetch(MCP_BASE + '/health', {
                     method: 'GET',
                     headers: {
-                        'Accept': 'text/event-stream'
+                        'Accept': 'application/json'
                     }
                 });
                 
                 if (response.ok) {
-                    // For SSE, we won't get JSON, just check if connection works
-                    const contentType = response.headers.get('content-type');
+                    const data = await response.json();
                     resultDiv.innerHTML = `
                         <div class="alert alert-success">
                             <strong>✅ MCP Server Connection Successful!</strong><br>
-                            Status: ${response.status}<br>
-                            Content-Type: ${contentType || 'Not specified'}<br>
-                            <small>Note: MCP uses Server-Sent Events (SSE) for communication</small>
+                            <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data, null, 2)}</pre>
                         </div>
                     `;
                 } else {
+                    const text = await response.text();
                     resultDiv.innerHTML = `
                         <div class="alert alert-warning">
                             <strong>⚠️ MCP server responded with error</strong><br>
                             Status: ${response.status}<br>
-                            Status Text: ${response.statusText}
+                            Status Text: ${response.statusText}<br>
+                            <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">${text}</pre>
                         </div>
                     `;
                 }
