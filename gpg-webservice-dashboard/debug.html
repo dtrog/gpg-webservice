@@ -55,6 +55,18 @@
             <div id="corsResult" style="margin-top: 15px;"></div>
         </div>
 
+        <div class="form-group">
+            <h3>MCP Server Connectivity Test</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;"><strong>MCP Base URL:</strong></label>
+                <span id="mcpBase" style="color: #2563eb; font-weight: bold;"></span>
+            </div>
+            <button type="button" class="btn" id="mcpTestBtn" onclick="testMcp()">
+                Test MCP Connection
+            </button>
+            <div id="mcpResult" style="margin-top: 15px;"></div>
+        </div>
+
         <div class="nav-links">
             <a href="index.html">← Back to Home</a>
             <a href="register.html">Register</a>
@@ -64,12 +76,24 @@
 
     <script src="js/app.js?v=2"></script>
     <script>
+        // MCP Configuration
+        function getMcpBase() {
+            const hostname = window.location.hostname;
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                return 'http://localhost:3000';
+            }
+            return window.location.protocol + '//' + hostname + ':3000';
+        }
+
+        const MCP_BASE = getMcpBase();
+
         // Display environment info
         document.getElementById('hostname').textContent = window.location.hostname;
         document.getElementById('port').textContent = window.location.port || '(default)';
         document.getElementById('protocol').textContent = window.location.protocol;
         document.getElementById('fullUrl').textContent = window.location.href;
         document.getElementById('apiBase').textContent = API_BASE;
+        document.getElementById('mcpBase').textContent = MCP_BASE;
 
         async function testApi() {
             const testBtn = document.getElementById('testBtn');
@@ -176,6 +200,63 @@
             } finally {
                 corsBtn.disabled = false;
                 corsBtn.textContent = 'Test CORS Headers';
+            }
+        }
+
+        async function testMcp() {
+            const mcpBtn = document.getElementById('mcpTestBtn');
+            const resultDiv = document.getElementById('mcpResult');
+            
+            mcpBtn.disabled = true;
+            mcpBtn.textContent = 'Testing...';
+            resultDiv.innerHTML = '<div class="alert alert-info">Testing MCP server connection...</div>';
+            
+            try {
+                // Test SSE endpoint (MCP uses Server-Sent Events)
+                const response = await fetch(MCP_BASE + '/sse', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/event-stream'
+                    }
+                });
+                
+                if (response.ok) {
+                    // For SSE, we won't get JSON, just check if connection works
+                    const contentType = response.headers.get('content-type');
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ MCP Server Connection Successful!</strong><br>
+                            Status: ${response.status}<br>
+                            Content-Type: ${contentType || 'Not specified'}<br>
+                            <small>Note: MCP uses Server-Sent Events (SSE) for communication</small>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>⚠️ MCP server responded with error</strong><br>
+                            Status: ${response.status}<br>
+                            Status Text: ${response.statusText}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ MCP Connection Failed</strong><br>
+                        Error: ${error.message}<br><br>
+                        <strong>Possible causes:</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>MCP server is not running on port 3000</li>
+                            <li>CORS is blocking the request</li>
+                            <li>Firewall is blocking the connection</li>
+                            <li>MCP_BASE URL is incorrect: <code>${MCP_BASE}</code></li>
+                        </ul>
+                    </div>
+                `;
+            } finally {
+                mcpBtn.disabled = false;
+                mcpBtn.textContent = 'Test MCP Connection';
             }
         }
 
