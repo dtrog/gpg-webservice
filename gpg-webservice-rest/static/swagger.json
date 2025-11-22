@@ -10,7 +10,7 @@
   },
   "servers": [
     {
-      "url": "https://51.210.109.137:5555",
+      "url": "https://vps-b5527a39.vps.ovh.net",
       "description": "Production server"
     }
   ],

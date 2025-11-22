@@ -275,6 +275,11 @@ For ChatGPT and other web-based clients, use the HTTP transport:
    ```
    http://localhost:3000/mcp
    ```
+   
+   **Production endpoint**:
+   ```
+   https://vps-b5527a39.vps.ovh.net/mcp
+   ```
 
 3. **For external access** (deploy to a server):
    - Set `MCP_HOST=0.0.0.0` in `.env`
