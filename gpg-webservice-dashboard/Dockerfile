@@ -9,6 +9,7 @@ COPY register.html /usr/share/nginx/html/
 COPY login.html /usr/share/nginx/html/
 COPY profile.html /usr/share/nginx/html/
 COPY debug.html /usr/share/nginx/html/
+COPY admin.html /usr/share/nginx/html/
 COPY css/ /usr/share/nginx/html/css/
 COPY js/ /usr/share/nginx/html/js/
 
