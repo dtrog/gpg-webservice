@@ -80,7 +80,7 @@
             resultDiv.innerHTML = '<div class="alert alert-info">Testing API connection...</div>';
             
             try {
-                const response = await fetch(API_BASE + '/health', {
+                const response = await fetch(API_BASE + '/openai/function_definitions', {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json'
@@ -134,7 +134,7 @@
             resultDiv.innerHTML = '<div class="alert alert-info">Testing CORS configuration...</div>';
             
             try {
-                const response = await fetch(API_BASE + '/health', {
+                const response = await fetch(API_BASE + '/openai/function_definitions', {
                     method: 'OPTIONS',
                     headers: {
                         'Origin': window.location.origin,
