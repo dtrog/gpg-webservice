@@ -10,6 +10,10 @@
   },
   "servers": [
     {
+      "url": "http://51.210.109.137:5555",
+      "description": "Production server"
+    },
+    {
       "url": "http://localhost:5555",
       "description": "Local development server"
     }
