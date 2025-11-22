@@ -5,13 +5,15 @@ Web frontend for the GPG Webservice REST API. Provides a user-friendly interface
 ## Features
 
 - **User Registration** - Create an account with automatic GPG keypair generation
-- **Login & Authentication** - Secure session management with API key storage
+- **Login & Authentication** - Secure session management with deterministic session keys (hourly expiration)
 - **Profile Management** - View and update account information
+- **Admin Panel** - Manage users and perform administrative tasks
 - **PGP Key Operations**:
   - Download public/private keys
   - Upload existing keys
   - View key status
-- **API Key Management** - View masked API key, retrieve with password
+- **API Key Management** - Session keys expire hourly, refresh via login
+- **Debug Tools** - Test API and MCP connectivity
 
 ## Architecture
 
@@ -24,6 +26,8 @@ This is a static web application served by nginx that communicates with the GPG 
   - `register.html` - User registration form
   - `login.html` - Login form
   - `profile.html` - User dashboard and profile management
+  - `admin.html` - Admin panel for user management
+  - `debug.html` - API and MCP connectivity testing
 
 - **Styling**: `css/styles.css` - Responsive CSS with modern design
 
@@ -75,10 +79,13 @@ const API_BASE = 'https://localhost';
 
 1. Visit `/register.html`
 2. Fill in username, email, password
-3. Optionally upload existing PGP keys
-4. Submit form
-5. **Important**: Copy and save the API key (shown once only!)
-6. Continue to login
+3. **Important**: Avoid reserved usernames: `admin`, `root`, `administrator`, `system`, `test`, `null`, `undefined`
+4. Optionally upload existing PGP keys
+5. Submit form
+6. **Important**: Copy and save the session key (starts with `sk_`, expires hourly!)
+7. Continue to login
+
+**Note**: Session keys expire after 1 hour. Use `/login` to get a fresh session key.
 
 ### Login Flow
 
@@ -93,15 +100,33 @@ const API_BASE = 'https://localhost';
 2. Update email address
 3. Download PGP keys
 4. Upload new keys (requires password confirmation)
-5. View/copy API key
+5. View/copy session key
+
+### Admin Panel
+
+**Access**: `/admin.html`
+
+Features:
+- **List All Users** - View all registered users
+- **Delete User** - Remove individual users (requires your session key)
+- **Bulk Delete** - Delete multiple users at once (one username per line)
+
+**Authentication**: Any registered user can access admin functions. The session key is used to verify you're authenticated.
+
+**Usage**:
+1. Register or login to get your session key
+2. Navigate to `/admin.html`
+3. Use your session key (starts with `sk_`) for delete operations
 
 ## Security
 
-- API keys stored in `sessionStorage` (cleared on tab close)
+- Session keys stored in `sessionStorage` (cleared on tab close)
+- **Session keys expire after 1 hour** - refresh via login
 - Password confirmation required for sensitive operations
-- HTTPS recommended for production
+- HTTPS required for production (via Caddy reverse proxy)
 - CSP headers configured in nginx
 - All API communication uses secure headers
+- **Reserved usernames**: Cannot use `admin`, `root`, `administrator`, `system`, `test`, `null`, `undefined`
 
 ## Deployment
 
@@ -160,14 +185,16 @@ gpg-webservice-dashboard/
 The dashboard communicates with these backend endpoints:
 
 - `POST /register/form` - User registration (multipart/form-data)
-- `POST /login` - User authentication
-- `POST /get_api_key` - Retrieve masked API key
+- `POST /login` - User authentication (returns fresh session key)
+- `POST /get_api_key` - Retrieve masked session key
 - `GET /profile` - Get user profile
 - `PUT /profile` - Update user profile
 - `GET /keys/download?type=public|private` - Download PGP keys
 - `POST /keys/upload` - Upload PGP keys
+- `GET /admin/users` - List all users (admin)
+- `DELETE /admin/users/<username>` - Delete user (admin, requires session key)
 
-All protected endpoints require `X-API-KEY` header.
+All protected endpoints require `X-API-KEY` header with session key (starts with `sk_`).
 
 ## Troubleshooting
 
@@ -176,12 +203,14 @@ All protected endpoints require `X-API-KEY` header.
 - Check backend is running: `curl http://localhost:5555/openai/function_definitions`
 - Verify CORS configuration in backend allows dashboard origin
 - Check browser console for errors
+- Verify Caddy reverse proxy is routing correctly
 
-### API key not working
+### Session key not working
 
-- Ensure API key was copied correctly during registration
+- Ensure session key was copied correctly (starts with `sk_`)
 - Check `sessionStorage` in browser DevTools
-- Verify API key hasn't been revoked
+- **Session keys expire after 1 hour** - login again to get a fresh key
+- Verify session key format is correct
 
 ### File upload fails
 
