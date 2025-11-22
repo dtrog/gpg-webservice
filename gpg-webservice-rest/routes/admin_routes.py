@@ -45,14 +45,14 @@ def list_users():
     try:
         session = get_session()
         
-        users = session.query(User).order_by(User.created_at.desc()).all()
+        users = session.query(User).order_by(User.id.desc()).all()
         
         user_list = []
         for user in users:
             user_list.append({
                 'username': user.username,
-                'email': user.email,
-                'created_at': user.created_at.isoformat() if user.created_at else None
+                'email': None,  # User model doesn't have email field
+                'created_at': None  # User model doesn't have timestamp
             })
         
         session.close()
