@@ -1,10 +1,27 @@
 // GPG Webservice Dashboard - Shared JavaScript
 
 // API Configuration
-// Use nginx proxy in production, direct connection in development
-const API_BASE = window.location.hostname === 'localhost'
-    ? 'http://localhost:5555'
-    : window.location.origin + '/api';
+// Determine API base URL based on environment
+function getApiBase() {
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    
+    // Development: Direct connection to Flask
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:5555';
+    }
+    
+    // Production with nginx proxy on port 8080
+    if (port === '8080') {
+        return window.location.protocol + '//' + hostname + ':8080/api';
+    }
+    
+    // Production: Direct connection to Flask on port 5555
+    // This handles cases where dashboard is on 8080 but API is on 5555
+    return window.location.protocol + '//' + hostname + ':5555';
+}
+
+const API_BASE = getApiBase();
 
 // Utility function to show alerts
 function showAlert(message, type = 'info') {

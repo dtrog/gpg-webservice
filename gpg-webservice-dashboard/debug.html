@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - GPG Webservice</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Debug Information</h1>
+            <p>API Configuration & Connectivity Test</p>
+        </div>
+
+        <div class="form-group">
+            <h3>Environment Detection</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hostname:</strong></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;" id="hostname"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><strong>Port:</strong></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;" id="port"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><strong>Protocol:</strong></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;" id="protocol"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><strong>Full URL:</strong></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;" id="fullUrl"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><strong>API Base:</strong></td>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; color: #2563eb;" id="apiBase"></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="form-group">
+            <h3>API Connectivity Test</h3>
+            <button type="button" class="btn" id="testBtn" onclick="testApi()">
+                Test API Connection
+            </button>
+            <div id="testResult" style="margin-top: 15px;"></div>
+        </div>
+
+        <div class="form-group">
+            <h3>CORS Test</h3>
+            <button type="button" class="btn" id="corsTestBtn" onclick="testCors()">
+                Test CORS Headers
+            </button>
+            <div id="corsResult" style="margin-top: 15px;"></div>
+        </div>
+
+        <div class="nav-links">
+            <a href="index.html">← Back to Home</a>
+            <a href="register.html">Register</a>
+            <a href="login.html">Login</a>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Display environment info
+        document.getElementById('hostname').textContent = window.location.hostname;
+        document.getElementById('port').textContent = window.location.port || '(default)';
+        document.getElementById('protocol').textContent = window.location.protocol;
+        document.getElementById('fullUrl').textContent = window.location.href;
+        document.getElementById('apiBase').textContent = API_BASE;
+
+        async function testApi() {
+            const testBtn = document.getElementById('testBtn');
+            const resultDiv = document.getElementById('testResult');
+            
+            testBtn.disabled = true;
+            testBtn.textContent = 'Testing...';
+            resultDiv.innerHTML = '<div class="alert alert-info">Testing API connection...</div>';
+            
+            try {
+                const response = await fetch(API_BASE + '/health', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ API Connection Successful!</strong><br>
+                            <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>⚠️ API responded with error</strong><br>
+                            Status: ${response.status}<br>
+                            Response: <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px;">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Connection Failed</strong><br>
+                        Error: ${error.message}<br><br>
+                        <strong>Possible causes:</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>Flask backend is not running on port 5555</li>
+                            <li>CORS is blocking the request</li>
+                            <li>Firewall is blocking the connection</li>
+                            <li>API_BASE URL is incorrect: <code>${API_BASE}</code></li>
+                        </ul>
+                    </div>
+                `;
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = 'Test API Connection';
+            }
+        }
+
+        async function testCors() {
+            const corsBtn = document.getElementById('corsTestBtn');
+            const resultDiv = document.getElementById('corsResult');
+            
+            corsBtn.disabled = true;
+            corsBtn.textContent = 'Testing...';
+            resultDiv.innerHTML = '<div class="alert alert-info">Testing CORS configuration...</div>';
+            
+            try {
+                const response = await fetch(API_BASE + '/health', {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type, X-API-KEY'
+                    }
+                });
+                
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().startsWith('access-control')) {
+                        headers[key] = value;
+                    }
+                });
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ CORS Configuration OK</strong><br>
+                            <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(headers, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>⚠️ CORS Preflight Failed</strong><br>
+                            Status: ${response.status}<br>
+                            Headers: <pre style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 4px;">${JSON.stringify(headers, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ CORS Test Failed</strong><br>
+                        Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                corsBtn.disabled = false;
+                corsBtn.textContent = 'Test CORS Headers';
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                testApi();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
