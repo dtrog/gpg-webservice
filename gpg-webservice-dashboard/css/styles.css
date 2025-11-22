@@ -338,3 +338,62 @@ body {
     color: #856404;
     font-size: 0.9rem;
 }
+
+/* Admin page styles */
+.admin-section {
+    margin: 20px 0;
+}
+
+.user-list {
+    margin-top: 15px;
+}
+
+.user-list table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.user-list table th,
+.user-list table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #e1e8ed;
+}
+
+.user-list table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+}
+
+.user-list table code {
+    background: #f1f3f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.btn-danger {
+    background: #dc3545;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e1e8ed;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+}
+
+textarea:focus {
+    border-color: #0070f3;
+    outline: none;
+}
+

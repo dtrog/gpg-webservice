@@ -17,6 +17,7 @@ from utils.gpg_utils import generate_gpg_keypair
 from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
 from routes.openai_routes import openai_bp, get_function_definitions
+from routes.admin_routes import admin_bp
 from utils.security_utils import add_security_headers
 
 # Load configuration
@@ -65,6 +66,7 @@ logging.info(
 app.register_blueprint(user_bp)
 app.register_blueprint(gpg_bp)
 app.register_blueprint(openai_bp)
+app.register_blueprint(admin_bp)
 
 
 # Serve the index page at root
