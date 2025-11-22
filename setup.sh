@@ -323,7 +323,77 @@ done
 echo ""
 
 # =============================================================================
-# Step 8: Display Access Information
+# Step 8: Create Administrator Account
+# =============================================================================
+
+print_header "Step 8: Creating Administrator Account"
+
+if [ "$AUTO_MODE" = true ]; then
+    print_info "Auto mode: Skipping administrator account creation"
+    print_info "Set ADMIN_USERNAMES in .env and register manually"
+else
+    if confirm "Would you like to create an administrator account?"; then
+        echo ""
+        read -p "Admin username (default: administrator): " ADMIN_USER
+        ADMIN_USER=${ADMIN_USER:-administrator}
+        
+        read -s -p "Admin password (must be strong): " ADMIN_PASS
+        echo ""
+        
+        if [ -z "$ADMIN_PASS" ]; then
+            print_error "Password cannot be empty"
+        else
+            # Add admin username to .env
+            if grep -q "^ADMIN_USERNAMES=" .env; then
+                # Append to existing
+                CURRENT=$(grep "^ADMIN_USERNAMES=" .env | cut -d '=' -f2-)
+                if [ -z "$CURRENT" ]; then
+                    sed -i.bak "s|^ADMIN_USERNAMES=.*|ADMIN_USERNAMES=$ADMIN_USER|" .env
+                else
+                    sed -i.bak "s|^ADMIN_USERNAMES=.*|ADMIN_USERNAMES=$CURRENT,$ADMIN_USER|" .env
+                fi
+            else
+                echo "ADMIN_USERNAMES=$ADMIN_USER" >> .env
+            fi
+            rm -f .env.bak
+            
+            # Restart REST API to pick up new env var
+            print_info "Restarting REST API with admin configuration..."
+            docker-compose restart gpg-webservice-rest
+            
+            # Wait for service
+            sleep 5
+            
+            # Try to register admin user
+            print_info "Registering administrator account..."
+            REGISTER_RESULT=$(curl -s -X POST http://localhost:5555/register \
+                -H "Content-Type: application/json" \
+                -d "{\"username\": \"$ADMIN_USER\", \"password\": \"$ADMIN_PASS\"}" 2>&1)
+            
+            if echo "$REGISTER_RESULT" | grep -q "successfully"; then
+                print_success "Administrator account created: $ADMIN_USER"
+                print_info "Save your credentials securely!"
+            elif echo "$REGISTER_RESULT" | grep -q "already exists"; then
+                print_warning "Username $ADMIN_USER already exists"
+                print_info "You can still use it for admin operations if configured in ADMIN_USERNAMES"
+            else
+                print_warning "Could not auto-register administrator"
+                print_info "Register manually at: http://localhost:8080/register.html"
+                print_info "Username: $ADMIN_USER"
+            fi
+            
+            print_success "Admin username added to ADMIN_USERNAMES: $ADMIN_USER"
+        fi
+    else
+        print_info "Skipping administrator account creation"
+        print_info "To enable admin access later, set ADMIN_USERNAMES in .env"
+    fi
+fi
+
+echo ""
+
+# =============================================================================
+# Step 9: Display Access Information
 # =============================================================================
 
 print_header "✅ Setup Complete!"
@@ -340,8 +410,14 @@ echo "  curl http://localhost:5555/openai/function_definitions"
 echo ""
 echo "Next Steps:"
 echo "  1. Open dashboard: http://localhost:8080"
-echo "  2. Register a user"
-echo "  3. Try signing a file"
+if grep -q "^ADMIN_USERNAMES=" .env && [ -n "$(grep "^ADMIN_USERNAMES=" .env | cut -d '=' -f2-)" ]; then
+    ADMIN_USER=$(grep "^ADMIN_USERNAMES=" .env | cut -d '=' -f2- | cut -d ',' -f1)
+    echo "  2. Login with admin account: $ADMIN_USER"
+    echo "  3. Access admin panel: http://localhost:8080/admin.html"
+else
+    echo "  2. Register a user"
+    echo "  3. Try signing a file"
+fi
 echo ""
 echo "Documentation:"
 echo "  📖 README.md       - Complete guide"
