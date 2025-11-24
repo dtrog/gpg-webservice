@@ -1,10 +1,10 @@
 # GPG utility functions
 
-
-
+import base64
 import tempfile
 import subprocess
 import os
+from typing import Tuple
 SERVICE_KEYSTORE_PATH = os.environ.get('SERVICE_KEYSTORE_PATH', '/srv/gpg-keystore')
 SERVICE_KEY_EMAIL = os.environ.get('SERVICE_KEY_EMAIL', 'service@example.com')
 SERVICE_KEY_NAME = os.environ.get('SERVICE_KEY_NAME', 'GPG Webservice')
@@ -170,3 +170,82 @@ def verify_signature(data: str, signature: str, public_key: str) -> bool:
         ]
         result = subprocess.run(verify_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return result.returncode == 0
+
+
+def verify_gpg_signature(message: str, signature: str, public_key: str) -> Tuple[bool, str]:
+    """
+    Verify a GPG signature against a public key.
+    
+    Args:
+        message: The original text that was signed
+        signature: Base64-encoded detached signature or ASCII-armored signature
+        public_key: ASCII-armored PGP public key
+        
+    Returns:
+        Tuple[bool, str]: (is_valid, error_message)
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            # Create temporary GPG home
+            gnupg_home = os.path.join(tmpdir, '.gnupg')
+            os.makedirs(gnupg_home, mode=0o700)
+            
+            # Import public key
+            pubkey_path = os.path.join(tmpdir, 'pubkey.asc')
+            with open(pubkey_path, 'w') as f:
+                f.write(public_key)
+            
+            import_cmd = [
+                'gpg', '--homedir', gnupg_home,
+                '--batch', '--import', pubkey_path
+            ]
+            import_result = subprocess.run(
+                import_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if import_result.returncode != 0:
+                return False, f"Failed to import public key: {import_result.stderr.decode()}"
+            
+            # Write message to file
+            message_path = os.path.join(tmpdir, 'message.txt')
+            with open(message_path, 'w') as f:
+                f.write(message)
+            
+            # Handle signature format
+            sig_path = os.path.join(tmpdir, 'signature.sig')
+            
+            # If signature starts with -----BEGIN PGP, it's ASCII-armored
+            if signature.strip().startswith('-----BEGIN PGP'):
+                with open(sig_path, 'w') as f:
+                    f.write(signature)
+            else:
+                # Assume it's base64-encoded, decode it
+                try:
+                    import base64
+                    sig_bytes = base64.b64decode(signature)
+                    with open(sig_path, 'wb') as f:
+                        f.write(sig_bytes)
+                except Exception as e:
+                    return False, f"Failed to decode signature: {str(e)}"
+            
+            # Verify signature
+            verify_cmd = [
+                'gpg', '--homedir', gnupg_home,
+                '--batch', '--verify', sig_path, message_path
+            ]
+            verify_result = subprocess.run(
+                verify_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if verify_result.returncode == 0:
+                return True, "Signature valid"
+            else:
+                error_msg = verify_result.stderr.decode()
+                return False, f"Signature verification failed: {error_msg}"
+                
+        except Exception as e:
+            return False, f"Verification error: {str(e)}"
