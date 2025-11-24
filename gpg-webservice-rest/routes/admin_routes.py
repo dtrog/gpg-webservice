@@ -4,6 +4,7 @@ from functools import wraps
 from db.database import get_session
 from models.user import User
 from services.auth_service import authenticate_request
+from routes.admin_auth_routes import verify_admin_token
 import logging
 import os
 
@@ -19,17 +20,40 @@ ADMIN_USERNAMES = set(
 )
 
 def require_admin(f):
-    """Decorator to require admin authentication via session key or API key."""
+    """
+    Decorator to require admin authentication.
+    
+    Supports two authentication methods:
+    1. Admin Token (X-Admin-Token): GPG-signed, 24h validity, no expiration
+    2. Session Key (X-API-KEY + X-Username): For AI agents, 1h expiration
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Try admin token first (GPG-based, non-expiring)
+        admin_token = request.headers.get('X-Admin-Token')
+        if admin_token:
+            username = verify_admin_token(admin_token)
+            if username:
+                request.admin_username = username
+                logger.info(f"Admin {username} authenticated via GPG token")
+                return f(*args, **kwargs)
+            else:
+                return jsonify({
+                    'error': 'Invalid or expired admin token'
+                }), 403
+        
+        # Fall back to session key authentication (for AI agents)
         api_key = request.headers.get('X-API-KEY')
-        username = request.headers.get('X-Username')
+        username_header = request.headers.get('X-Username')
         
         if not api_key:
-            return jsonify({'error': 'Admin API key required'}), 401
+            return jsonify({
+                'error': 'Authentication required',
+                'hint': 'Use X-Admin-Token (GPG) or X-API-KEY (session)'
+            }), 401
         
-        # Use unified authentication that handles both session keys and legacy keys
-        user, message = authenticate_request(username, api_key)
+        # Authenticate with session key
+        user, message = authenticate_request(username_header, api_key)
         
         if not user:
             return jsonify({'error': message}), 403
@@ -55,6 +79,9 @@ def require_admin(f):
         
         # Store username for logging
         request.admin_username = user.username
+        logger.info(
+            f"Admin {user.username} authenticated via session key"
+        )
         return f(*args, **kwargs)
     
     return decorated_function

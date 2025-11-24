@@ -18,6 +18,7 @@ from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
 from routes.openai_routes import openai_bp, get_function_definitions
 from routes.admin_routes import admin_bp
+from routes.admin_auth_routes import admin_auth_bp
 from utils.security_utils import add_security_headers
 
 # Load configuration
@@ -26,14 +27,19 @@ config_class = get_config()
 app.config.from_object(config_class)
 
 # Initialize CORS
-# Allow all origins for flexibility (can be restricted in production via environment variable)
+# Allow all origins for flexibility (restricted in production via env var)
 allowed_origins = os.environ.get('CORS_ORIGINS', '*')
 if allowed_origins == '*':
     CORS(app, resources={
         r"/*": {
             "origins": "*",
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "X-API-KEY", "X-Username"],
+            "allow_headers": [
+                "Content-Type",
+                "X-API-KEY",
+                "X-Username",
+                "X-Admin-Token"
+            ],
             "expose_headers": ["Content-Disposition"]
         }
     })
@@ -43,7 +49,12 @@ else:
         r"/*": {
             "origins": origins_list,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "X-API-KEY", "X-Username"],
+            "allow_headers": [
+                "Content-Type",
+                "X-API-KEY",
+                "X-Username",
+                "X-Admin-Token"
+            ],
             "expose_headers": ["Content-Disposition"]
         }
     })
@@ -67,6 +78,7 @@ app.register_blueprint(user_bp)
 app.register_blueprint(gpg_bp)
 app.register_blueprint(openai_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(admin_auth_bp)
 
 
 # Serve the index page at root
