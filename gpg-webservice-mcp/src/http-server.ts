@@ -364,14 +364,18 @@ async function main() {
   const app = createApp(functionDefinitions, actualBaseUrl, appConfig.gpgApiKey);
 
   // Start server — support optional TLS when `TLS_CERT` and `TLS_KEY` are provided.
+  // Skip TLS on Render.com (they handle TLS at the edge) or when certs don't exist.
   const tlsCert = process.env.TLS_CERT;
   const tlsKey = process.env.TLS_KEY;
+  const isRender = process.env.RENDER !== undefined;
 
-  if (tlsCert && tlsKey) {
+  const canUseTLS = tlsCert && tlsKey && !isRender && fs.existsSync(tlsCert) && fs.existsSync(tlsKey);
+
+  if (canUseTLS) {
     try {
       const options = {
-        cert: fs.readFileSync(tlsCert),
-        key: fs.readFileSync(tlsKey),
+        cert: fs.readFileSync(tlsCert!),
+        key: fs.readFileSync(tlsKey!),
       };
 
       https.createServer(options, app).listen(appConfig.port, appConfig.host, () => {
@@ -386,6 +390,9 @@ async function main() {
     }
   } else {
     // Fallback to plain HTTP
+    if (isRender) {
+      console.log('Running on Render.com - TLS handled at edge, starting HTTP server');
+    }
     app.listen(appConfig.port, appConfig.host, () => {
       console.log(`\nGPG Webservice MCP Server listening on http://${appConfig.host}:${appConfig.port}`);
       console.log(`MCP endpoint: http://${appConfig.host}:${appConfig.port}/mcp`);

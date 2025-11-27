@@ -140,11 +140,16 @@ def after_request(response):
 # This block allows the app to be run directly for development purposes
 if __name__ == "__main__":
     # Support optional TLS using environment variables `TLS_CERT` and `TLS_KEY`.
+    # Skip TLS on Render.com (they handle TLS at the edge) or when certs don't exist.
     tls_cert = os.environ.get("TLS_CERT")
     tls_key = os.environ.get("TLS_KEY")
+    is_render = os.environ.get("RENDER") is not None
 
-    if tls_cert and tls_key:
+    if tls_cert and tls_key and not is_render and os.path.exists(tls_cert) and os.path.exists(tls_key):
         # Run Flask development server with SSL context for local testing.
+        logging.info("Starting Flask with TLS (local development)")
         app.run(host=config_class.HOST, port=config_class.PORT, ssl_context=(tls_cert, tls_key))
     else:
+        if is_render:
+            logging.info("Running on Render.com - TLS handled at edge, starting HTTP server")
         app.run(host=config_class.HOST, port=config_class.PORT)

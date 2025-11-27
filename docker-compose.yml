@@ -53,7 +53,7 @@ services:
     networks:
       - gpg-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${FLASK_PORT:-5555}/openai/function_definitions')"]
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl._create_unverified_context(); urllib.request.urlopen('https://localhost:${FLASK_PORT:-5555}/openai/function_definitions', context=ctx)"]
       interval: 30s
       timeout: 10s
       retries: 3
