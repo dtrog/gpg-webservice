@@ -1,25 +1,25 @@
+"""
+GPG Webservice REST API Application Entry Point.
+Sets up the Flask app, configuration, CORS, database,
+and registers blueprints for various routes."""
+
 import os
+import logging
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-from flask import Flask, request, send_from_directory
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from config import get_config
-from db.database import db, init_db
-from models.user import User
-from models.pgp_key import PgpKey
-from models.challenge import Challenge
-from utils.crypto_utils import encrypt_private_key, decrypt_private_key
-from utils.gpg_utils import generate_gpg_keypair
-
+from db.database import init_db
 from routes.user_routes import user_bp
 from routes.gpg_routes import gpg_bp
 from routes.openai_routes import openai_bp, get_function_definitions
 from routes.admin_routes import admin_bp
 from routes.admin_auth_routes import admin_auth_bp
 from utils.security_utils import add_security_headers
+
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Load configuration
 app = Flask(__name__)
@@ -62,17 +62,14 @@ else:
 # Initialize database
 init_db(app)
 
-# Log application startup
-import logging
-
 logging.basicConfig(
     level=getattr(logging, config_class.LOG_LEVEL, logging.INFO),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logging.info(
-    f"GPG Webservice starting (env: {os.environ.get('FLASK_ENV', 'development')})"
+    "GPG Webservice starting (env: %s)",
+    os.environ.get("FLASK_ENV", "development")
 )
-
 # Register blueprints
 app.register_blueprint(user_bp)
 app.register_blueprint(gpg_bp)
@@ -145,10 +142,12 @@ if __name__ == "__main__":
     tls_key = os.environ.get("TLS_KEY")
     is_render = os.environ.get("RENDER") is not None
 
-    if tls_cert and tls_key and not is_render and os.path.exists(tls_cert) and os.path.exists(tls_key):
+    if tls_cert and tls_key and not is_render \
+        and os.path.exists(tls_cert) and os.path.exists(tls_key):
         # Run Flask development server with SSL context for local testing.
         logging.info("Starting Flask with TLS (local development)")
-        app.run(host=config_class.HOST, port=config_class.PORT, ssl_context=(tls_cert, tls_key))
+        app.run(host=config_class.HOST, port=config_class.PORT, 
+                ssl_context=(tls_cert, tls_key))
     else:
         if is_render:
             logging.info("Running on Render.com - TLS handled at edge, starting HTTP server")
