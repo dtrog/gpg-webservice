@@ -27,6 +27,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${FLASK_PORT:-5555}:${FLASK_PORT:-5555}"
+      - "${REST_SECURE_PORT:-5443}:5555"
     env_file:
       - .env
       - ./gpg-webservice-rest/.env
@@ -39,11 +40,16 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE=/app/gpg_users.db
       - ADMIN_USERNAMES=${ADMIN_USERNAMES:-}
+      - TLS_CERT=/etc/ssl/certs/dashboard.pem
+      - TLS_KEY=/etc/ssl/private/dashboard-key.pem
     volumes:
+      - ./certs/dashboard.pem:/etc/ssl/certs/dashboard.pem:ro
+      - ./certs/dashboard-key.pem:/etc/ssl/private/dashboard-key.pem:ro
       # Database persistence (SQLite stored in REST API directory)
       - ./gpg-webservice-rest/gpg_users.db:/app/gpg_users.db
       # GPG temporary directory
       - gpg-temp:/tmp/gnupg
+    user: root
     networks:
       - gpg-network
     healthcheck:
@@ -64,12 +70,19 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${MCP_PORT:-3000}:${MCP_PORT:-3000}"
+      - "${MCP_SECURE_PORT:-3443}:3000"
     env_file:
       - .env
     environment:
       - MCP_PORT=${MCP_PORT:-3000}
       - MCP_HOST=0.0.0.0
-      - GPG_API_BASE=http://gpg-webservice-rest:5555
+      - GPG_API_BASE=https://gpg-webservice-rest:5555
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - TLS_CERT=/etc/ssl/certs/dashboard.pem
+      - TLS_KEY=/etc/ssl/private/dashboard-key.pem
+    volumes:
+      - ./certs/dashboard.pem:/etc/ssl/certs/dashboard.pem:ro
+      - ./certs/dashboard-key.pem:/etc/ssl/private/dashboard-key.pem:ro
     depends_on:
       gpg-webservice-rest:
         condition: service_healthy

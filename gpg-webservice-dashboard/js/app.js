@@ -8,6 +8,11 @@ function getApiBase() {
     
     // Development: Direct connection to Flask
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // If the dashboard is being served over HTTPS locally, use the REST
+        // service secure port. Default secure port is 5443 for local dev.
+        if (window.location.protocol === 'https:') {
+            return window.location.protocol + '//' + hostname + ':5443';
+        }
         return 'http://localhost:5555';
     }
     

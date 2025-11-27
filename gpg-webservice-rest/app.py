@@ -139,4 +139,12 @@ def after_request(response):
 
 # This block allows the app to be run directly for development purposes
 if __name__ == "__main__":
-    app.run(host=config_class.HOST, port=config_class.PORT)
+    # Support optional TLS using environment variables `TLS_CERT` and `TLS_KEY`.
+    tls_cert = os.environ.get("TLS_CERT")
+    tls_key = os.environ.get("TLS_KEY")
+
+    if tls_cert and tls_key:
+        # Run Flask development server with SSL context for local testing.
+        app.run(host=config_class.HOST, port=config_class.PORT, ssl_context=(tls_cert, tls_key))
+    else:
+        app.run(host=config_class.HOST, port=config_class.PORT)

@@ -34,10 +34,10 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "@modelcontextprotocol/sdk": "^1.23.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.23.0",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",

@@ -15,6 +15,8 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import express, { Request, Response } from 'express';
+import https from 'https';
+import fs from 'fs';
 import cors from 'cors';
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
@@ -361,13 +363,36 @@ async function main() {
   // Create and configure app
   const app = createApp(functionDefinitions, actualBaseUrl, appConfig.gpgApiKey);
 
-  // Start HTTP server
-  app.listen(appConfig.port, appConfig.host, () => {
-    console.log(`\nGPG Webservice MCP Server listening on http://${appConfig.host}:${appConfig.port}`);
-    console.log(`MCP endpoint: http://${appConfig.host}:${appConfig.port}/mcp`);
-    console.log(`Health check: http://${appConfig.host}:${appConfig.port}/health`);
-    console.log('\nReady to accept MCP connections from ChatGPT and other clients\n');
-  });
+  // Start server — support optional TLS when `TLS_CERT` and `TLS_KEY` are provided.
+  const tlsCert = process.env.TLS_CERT;
+  const tlsKey = process.env.TLS_KEY;
+
+  if (tlsCert && tlsKey) {
+    try {
+      const options = {
+        cert: fs.readFileSync(tlsCert),
+        key: fs.readFileSync(tlsKey),
+      };
+
+      https.createServer(options, app).listen(appConfig.port, appConfig.host, () => {
+        console.log(`\nGPG Webservice MCP Server listening on https://${appConfig.host}:${appConfig.port}`);
+        console.log(`MCP endpoint: https://${appConfig.host}:${appConfig.port}/mcp`);
+        console.log(`Health check: https://${appConfig.host}:${appConfig.port}/health`);
+        console.log('\nReady to accept MCP connections from ChatGPT and other clients\n');
+      });
+    } catch (err) {
+      console.error('Failed to start HTTPS server for MCP:', err);
+      process.exit(1);
+    }
+  } else {
+    // Fallback to plain HTTP
+    app.listen(appConfig.port, appConfig.host, () => {
+      console.log(`\nGPG Webservice MCP Server listening on http://${appConfig.host}:${appConfig.port}`);
+      console.log(`MCP endpoint: http://${appConfig.host}:${appConfig.port}/mcp`);
+      console.log(`Health check: http://${appConfig.host}:${appConfig.port}/health`);
+      console.log('\nReady to accept MCP connections from ChatGPT and other clients\n');
+    });
+  }
 }
 
 // Run the server only when executed directly (not when imported for testing)
