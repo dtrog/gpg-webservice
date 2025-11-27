@@ -1,0 +1,144 @@
+# Unified Dockerfile for all GPG Webservice components
+# Uses supervisord to run multiple services and nginx as reverse proxy
+
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gnupg2 \
+    nginx \
+    supervisor \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# =============================================================================
+# Setup REST API
+# =============================================================================
+COPY gpg-webservice-rest/requirements.txt /app/rest/requirements.txt
+RUN pip install --no-cache-dir -r /app/rest/requirements.txt
+
+COPY gpg-webservice-rest/ /app/rest/
+
+# =============================================================================
+# Setup MCP Server
+# =============================================================================
+COPY gpg-webservice-mcp/package*.json /app/mcp/
+COPY gpg-webservice-mcp/tsconfig.json /app/mcp/
+WORKDIR /app/mcp
+RUN npm ci
+COPY gpg-webservice-mcp/src /app/mcp/src
+RUN npm run build && npm prune --production
+
+# =============================================================================
+# Setup Dashboard (static files)
+# =============================================================================
+WORKDIR /app
+COPY gpg-webservice-dashboard/ /app/dashboard/
+
+# =============================================================================
+# Configure Nginx as reverse proxy
+# =============================================================================
+COPY <<EOF /etc/nginx/sites-available/default
+server {
+    listen \${PORT:-10000};
+    server_name _;
+
+    # Dashboard (root)
+    location / {
+        root /app/dashboard;
+        try_files \$uri \$uri/ /index.html;
+        
+        # Inject API_URL into JavaScript
+        sub_filter 'window.GPG_CONFIG = {};' 'window.GPG_CONFIG = {apiUrl: "/api"};';
+        sub_filter_once on;
+        sub_filter_types application/javascript;
+    }
+
+    # REST API
+    location /api/ {
+        rewrite ^/api/(.*) /\$1 break;
+        proxy_pass http://localhost:5555;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # MCP Server
+    location /mcp/ {
+        rewrite ^/mcp/(.*) /\$1 break;
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # WebSocket support for MCP
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+# =============================================================================
+# Configure Supervisord
+# =============================================================================
+COPY <<EOF /etc/supervisor/conf.d/services.conf
+[supervisord]
+nodaemon=true
+user=root
+
+[program:rest-api]
+command=python /app/rest/app.py
+directory=/app/rest
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+environment=PORT="5555",HOST="127.0.0.1",GNUPGHOME="/tmp/gnupg",GPG_AGENT_INFO="",GPG_TTY=""
+
+[program:mcp-server]
+command=node /app/mcp/dist/http-server.js
+directory=/app/mcp
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+environment=MCP_PORT="3000",MCP_HOST="127.0.0.1",GPG_API_BASE="http://localhost:5555"
+
+[program:nginx]
+command=/bin/sh -c "envsubst '\${PORT}' < /etc/nginx/sites-available/default > /etc/nginx/sites-enabled/default && nginx -g 'daemon off;'"
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+EOF
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /var/lib/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    touch /run/nginx.pid && \
+    chown appuser:appuser /run/nginx.pid
+
+# Set environment defaults
+ENV PORT=10000
+ENV GNUPGHOME=/tmp/gnupg
+ENV GPG_AGENT_INFO=""
+ENV GPG_TTY=""
+
+EXPOSE ${PORT}
+
+# Start supervisord (which starts all services)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

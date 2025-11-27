@@ -10,20 +10,18 @@
 
 services:
   # =============================================================================
-  # Flask REST API (Core Service)
+  # Unified Service (REST API + MCP + Dashboard in one container)
   # =============================================================================
   - type: web
-    name: gpg-webservice-rest
+    name: gpg-webservice
     runtime: docker
-    dockerfilePath: ./Dockerfile.rest
+    dockerfilePath: ./Dockerfile.unified
     plan: starter
     region: oregon
     branch: main
     
-    # Render sets PORT automatically; service listens on this port
+    # Render sets PORT automatically; nginx listens on this port
     envVars:
-      - key: HOST
-        value: 0.0.0.0
       - key: FLASK_ENV
         value: production
       - key: ENVIRONMENT
@@ -31,22 +29,21 @@ services:
       - key: LOG_LEVEL
         value: INFO
       
-      # CRITICAL SECRETS - Set these in Render Dashboard as Secret Files or Environment Variables
-      # DO NOT commit these to GitHub!
+      # CRITICAL SECRETS - Set these in Render Dashboard
       - key: SERVICE_KEY_PASSPHRASE
-        sync: false  # Must be set manually in Render dashboard
+        sync: false
       - key: SECRET_KEY
-        sync: false  # Must be set manually in Render dashboard
+        sync: false
       
       # Admin access control
       - key: ADMIN_USERNAMES
-        sync: false  # e.g., "administrator,alice,bob"
+        sync: false
       - key: ADMIN_GPG_KEYS
-        sync: false  # JSON string with admin GPG keys
+        sync: false
       
-      # Database (SQLite default; override with PostgreSQL in dashboard)
+      # Database
       - key: DATABASE
-        value: /app/gpg_users.db
+        value: /app/rest/gpg_users.db
       
       # Rate limiting
       - key: RATE_LIMIT_AUTH_REQUESTS
@@ -75,62 +72,10 @@ services:
     # Persistent disk for SQLite database
     disk:
       name: gpg-data
-      mountPath: /app
+      mountPath: /app/rest
       sizeGB: 1
     
-    healthCheckPath: /openai/function_definitions
-    
-    autoDeploy: true
-
-  # =============================================================================
-  # MCP Server (AI Agent Interface)
-  # =============================================================================
-  - type: web
-    name: gpg-webservice-mcp
-    runtime: docker
-    dockerfilePath: ./Dockerfile.mcp
-    plan: starter
-    region: oregon
-    branch: main
-    
-    envVars:
-      # Render automatically sets PORT; MCP service will use it
-      - key: MCP_HOST
-        value: 0.0.0.0
-      
-      # Connect to REST API (update after REST service is deployed)
-      # Format: https://gpg-webservice-rest.onrender.com
-      - key: GPG_API_BASE
-        sync: false  # Set this manually after REST service is deployed
-      
-      # Optional: API key for authenticated requests to REST
-      - key: GPG_API_KEY
-        sync: false
-    
-    healthCheckPath: /health
-    
-    autoDeploy: true
-
-  # =============================================================================
-  # Dashboard (Static Web UI)
-  # =============================================================================
-  - type: web
-    name: gpg-webservice-dashboard
-    runtime: docker
-    dockerfilePath: ./Dockerfile.dashboard
-    plan: starter
-    region: oregon
-    branch: main
-    
-    envVars:
-      # Render automatically sets PORT; nginx.conf.template uses it via envsubst
-      # API endpoint for dashboard to connect to REST service
-      # Update after REST service is deployed
-      - key: API_URL
-        sync: false  # Set to https://gpg-webservice-rest.onrender.com
-    
-    # Nginx listens on $PORT inside container; Render proxies this
-    # No healthCheckPath needed (static files always available)
+    healthCheckPath: /api/openai/function_definitions
     
     autoDeploy: true
 

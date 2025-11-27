@@ -1,0 +1,78 @@
+# GPG Webservice - VPS Deployment with Unified Container
+# =======================================================
+# Single container running all three services via nginx reverse proxy
+# More cost-effective than separate containers
+#
+# Usage:
+#   docker compose -f docker-compose.vps.yml up -d --build
+#   docker compose -f docker-compose.vps.yml logs -f
+#   docker compose -f docker-compose.vps.yml down
+
+services:
+  # =============================================================================
+  # Unified Service (REST API + MCP Server + Dashboard)
+  # =============================================================================
+  gpg-webservice:
+    container_name: gpg-webservice
+    build:
+      context: .
+      dockerfile: Dockerfile.unified
+    ports:
+      - "80:10000"
+      - "443:10000"
+    environment:
+      # Port that nginx listens on (external)
+      - PORT=10000
+      
+      # Flask REST API (internal port 5555)
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SECRET_KEY=${SECRET_KEY}
+      - SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
+      - DATABASE=/app/rest/gpg_users.db
+      - ADMIN_USERNAMES=${ADMIN_USERNAMES}
+      - ADMIN_GPG_KEYS=${ADMIN_GPG_KEYS}
+      
+      # Rate limiting
+      - RATE_LIMIT_AUTH_REQUESTS=${RATE_LIMIT_AUTH_REQUESTS:-5}
+      - RATE_LIMIT_AUTH_WINDOW=${RATE_LIMIT_AUTH_WINDOW:-60}
+      - RATE_LIMIT_API_REQUESTS=${RATE_LIMIT_API_REQUESTS:-30}
+      - RATE_LIMIT_API_WINDOW=${RATE_LIMIT_API_WINDOW:-60}
+      
+      # File uploads
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-10}
+      - MAX_SIGNATURE_SIZE_MB=${MAX_SIGNATURE_SIZE_MB:-1}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-16777216}
+      
+      # GPG settings
+      - GPG_KEY_LENGTH=${GPG_KEY_LENGTH:-3072}
+      - GPG_KEY_TYPE=${GPG_KEY_TYPE:-RSA}
+      - GNUPGHOME=/tmp/gnupg
+      
+      # MCP Server (internal port 3000)
+      - MCP_PORT=3000
+      - MCP_HOST=127.0.0.1
+      - GPG_API_BASE=http://localhost:5555
+    volumes:
+      # Database persistence (SQLite)
+      - ./data/gpg_users.db:/app/rest/gpg_users.db
+      # GPG home directory persistence
+      - ./data/gnupg:/tmp/gnupg
+    networks:
+      - gpg-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:10000/api/openai/function_definitions"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  gpg-network:
+    driver: bridge
+    name: gpg-network
