@@ -113,7 +113,7 @@ services:
       - ./certs/dashboard.pem:/etc/ssl/certs/dashboard.pem:ro
       - ./certs/dashboard-key.pem:/etc/ssl/private/dashboard-key.pem:ro
     environment:
-      - API_URL=${API_URL:-http://localhost:5555}
+      - API_URL=${API_URL:-https://localhost:5443}
       # PORT env var not needed locally - nginx.conf is hardcoded
     depends_on:
       gpg-webservice-rest:

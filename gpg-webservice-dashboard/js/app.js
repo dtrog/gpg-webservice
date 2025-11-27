@@ -3,6 +3,11 @@
 // API Configuration
 // Determine API base URL based on environment
 function getApiBase() {
+    // First, check if config was injected (Render/production)
+    if (window.GPG_CONFIG && window.GPG_CONFIG.apiUrl) {
+        return window.GPG_CONFIG.apiUrl;
+    }
+    
     const hostname = window.location.hostname;
     const port = window.location.port;
     
