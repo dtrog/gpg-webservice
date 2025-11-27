@@ -23,8 +23,8 @@
                 <span id="displayUsername">-</span>
             </div>
             <div class="profile-field">
-                <label>Email:</label>
-                <input type="email" id="emailInput" style="border: none; background: transparent; font-family: inherit;">
+                <label for="emailInput">Email:</label>
+                <input type="email" id="emailInput" style="border: none; background: transparent; font-family: inherit;" placeholder="you@example.com">
             </div>
             <div class="profile-field">
                 <label>User ID:</label>
@@ -42,7 +42,8 @@
                 <p><strong>Keep your API key secure!</strong> This key provides access to all your GPG operations.</p>
             </div>
             <div class="api-key-display">
-                <input type="password" id="apiKeyDisplay" readonly value="••••••••••••••••••••">
+                <label for="apiKeyDisplay">API Key:</label>
+                <input type="password" id="apiKeyDisplay" readonly value="••••••••••••••••••••" aria-label="Your API key">
                 <button type="button" class="btn btn-small btn-secondary" id="revealApiKey">Reveal</button>
                 <button type="button" class="btn btn-small btn-success" id="copyApiKey">Copy</button>
             </div>
@@ -127,8 +128,8 @@
                 </div>
 
                 <div class="form-group hidden" id="revealedKeySection">
-                    <label>Your API Key:</label>
-                    <input type="text" id="revealedKey" readonly>
+                    <label for="revealedKey">Your API Key:</label>
+                    <input type="text" id="revealedKey" readonly aria-label="Revealed API key">
                 </div>
 
                 <div style="display: flex; gap: 10px;">

@@ -93,6 +93,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${DASHBOARD_PORT:-8080}:80"
+      - "${DASHBOARD_SECURE_PORT:-8443}:443"
+    volumes:
+      - ./gpg-webservice-dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs/dashboard.pem:/etc/ssl/certs/dashboard.pem:ro
+      - ./certs/dashboard-key.pem:/etc/ssl/private/dashboard-key.pem:ro
     environment:
       - API_URL=${API_URL:-http://localhost:5555}
     depends_on:

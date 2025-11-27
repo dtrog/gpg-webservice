@@ -1,6 +1,7 @@
 # GPG Webservice - Quick Start Guide
 
-This guide will get you up and running with the GPG Webservice suite in under 10 minutes.
+This guide will get you up and running with the GPG Webservice suite
+in under 10 minutes.
 
 ## Table of Contents
 
@@ -45,7 +46,7 @@ openssl version  # Should show OpenSSL 1.1.1+
 
 ### Method 1: Automated Setup (Easiest)
 
-**Estimated time: 3-5 minutes**
+**Estimated time:** 3-5 minutes
 
 ```bash
 # Step 1: Clone the repository
@@ -78,7 +79,7 @@ cd gpg-webservice
 
 ### Method 2: Manual Setup
 
-**Estimated time: 5-10 minutes**
+**Estimated time:** 5-10 minutes
 
 #### Step 1: Clone Repository
 
@@ -165,7 +166,8 @@ docker-compose ps
 ```
 
 Expected output:
-```
+
+```plaintext
 NAME                    STATE      PORTS
 gpg-webservice          Up         0.0.0.0:5555->5555/tcp
 gpg-mcp-server          Up         0.0.0.0:3000->3000/tcp
@@ -262,7 +264,7 @@ curl -X POST http://localhost:5555/verify \
 
 ### Step 1: Open Dashboard
 
-Navigate to: http://localhost:8080
+Navigate to: <http://localhost:8080>
 
 ### Step 2: Register via Web UI
 
@@ -476,7 +478,7 @@ docker-compose down -v && rm -f gpg-webservice-rest/gpg_users.db
 - 📖 **Full Documentation**: [README.md](./README.md)
 - 🏗️ **Architecture**: [docs/architecture.md](./gpg-webservice-rest/docs/architecture.md)
 - 🔐 **Security**: [docs/security.md](./gpg-webservice-rest/docs/security.md)
-- 🐛 **Report Issues**: <repository-issues-url>
+- 🐛 **Report Issues**: `https://github.com/dtrog/gpg-webservice/issues`
 
 ---
 

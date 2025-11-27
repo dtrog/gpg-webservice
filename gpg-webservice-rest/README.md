@@ -36,10 +36,12 @@ The codebase recently underwent comprehensive refactoring to improve code qualit
 
 ### Code Quality Enhancements
 
-**Builder Pattern for GPG Commands**
+**Builder Pattern for GPG Commands**:
+
 - Introduced `GPGCommandBuilder` class for fluent, readable GPG command construction
 - Reduced GPG operation code by 75% through consolidation
 - Example:
+
 ```python
 (GPGCommandBuilder(gnupg_home)
  .with_yes()
@@ -49,17 +51,20 @@ The codebase recently underwent comprehensive refactoring to improve code qualit
  .execute('signing'))
 ```
 
-**Named Constants for Cryptography**
+**Named Constants for Cryptography**:
+
 - All cryptographic parameters now use named constants (OWASP-compliant)
 - Self-documenting code with clear security parameter documentation
 - Constants: `ARGON2_*`, `PBKDF2_*`, cryptographic sizes
 
-**Code Consolidation**
+**Code Consolidation**:
+
 - Eliminated ~170 lines of duplicated code
 - Created reusable helper functions for GPG environment setup and key import
 - Improved error handling with comprehensive exception hierarchy
 
-**Performance Optimizations**
+**Performance Optimizations**:
+
 - Module-level imports for better performance
 - Removed deprecated code and unused imports
 
@@ -106,6 +111,7 @@ python3 app.py
 ### Authentication Endpoints
 
 #### `POST /register`
+
 Register a new user account with automatic GPG key generation.
 
 ```bash
@@ -119,6 +125,7 @@ curl -X POST http://localhost:5555/register \
 ```
 
 **Strong Password Requirements:**
+
 - Minimum 8 characters
 - At least one uppercase letter
 - At least one lowercase letter  
@@ -126,6 +133,7 @@ curl -X POST http://localhost:5555/register \
 - At least one special character (!@#$%^&*(),.?":{}|<>)
 
 **Response:**
+
 ```json
 {
   "message": "User registered",
@@ -138,6 +146,7 @@ curl -X POST http://localhost:5555/register \
 **⚠️ Security Note:** The `api_key` is **only returned once** at registration. Store it securely - it cannot be retrieved again through login.
 
 #### `POST /login`
+
 Authenticate user credentials.
 
 ```bash
@@ -150,6 +159,7 @@ curl -X POST http://localhost:5555/login \
 ```
 
 **Response:**
+
 ```json
 {
   "message": "Login successful",
@@ -164,6 +174,7 @@ curl -X POST http://localhost:5555/login \
 All cryptographic endpoints require the `X-API-KEY` header and are protected by rate limiting.
 
 #### `POST /sign`
+
 Sign a file with the user's private key.
 
 ```bash
@@ -173,11 +184,13 @@ curl -X POST http://localhost:5555/sign \
 ```
 
 **Features:**
+
 - File size limit: 5MB
 - Secure temporary file handling
 - Automatic cleanup of temporary resources
 
 #### `POST /verify`
+
 Verify a file signature against a public key.
 
 ```bash
@@ -188,6 +201,7 @@ curl -X POST http://localhost:5555/verify \
 ```
 
 #### `POST /encrypt`
+
 Encrypt a file for a specific recipient.
 
 ```bash
@@ -198,11 +212,13 @@ curl -X POST http://localhost:5555/encrypt \
 ```
 
 **Features:**
+
 - File size limit: 10MB  
 - Support for any binary file format
 - Recipient public key validation
 
 #### `POST /decrypt`
+
 Decrypt a file using the user's private key.
 
 ```bash
@@ -212,6 +228,7 @@ curl -X POST http://localhost:5555/decrypt \
 ```
 
 #### `GET /get_public_key`
+
 Retrieve the user's public key.
 
 ```bash
@@ -252,6 +269,7 @@ curl -X GET http://localhost:5555/openai/function_definitions
 ### Available AI Functions
 
 #### Register User Function
+
 ```python
 {
   "name": "register_user",
@@ -269,6 +287,7 @@ curl -X GET http://localhost:5555/openai/function_definitions
 ```
 
 #### Sign Text Function
+
 ```python
 {
   "name": "sign_text", 
@@ -331,14 +350,14 @@ if response.choices[0].message.get("function_call"):
 
 ### Available OpenAI Endpoints
 
-| Function | Endpoint | Description |
+|Function|Endpoint|Description|
 |----------|----------|-------------|
-| `register_user` | `POST /openai/register_user` | Register new user with GPG keys |
-| `sign_text` | `POST /openai/sign_text` | Sign text content |
-| `verify_text_signature` | `POST /openai/verify_text_signature` | Verify text signatures |
-| `encrypt_text` | `POST /openai/encrypt_text` | Encrypt text for recipients |
-| `decrypt_text` | `POST /openai/decrypt_text` | Decrypt text content |
-| `get_user_public_key` | `POST /openai/get_user_public_key` | Get user's public key |
+|`register_user`|`POST /openai/register_user`|Register new user with GPG keys|
+|`sign_text`|`POST /openai/sign_text`|Sign text content|
+|`verify_text_signature`|`POST /openai/verify_text_signature`|Verify text signatures|
+|`encrypt_text`|`POST /openai/encrypt_text`|Encrypt text for recipients|
+|`decrypt_text`|`POST /openai/decrypt_text`|Decrypt text content|
+|`get_user_public_key`|`POST /openai/get_user_public_key`|Get user's public key|
 
 ### Response Format
 
@@ -369,7 +388,7 @@ For complete OpenAI integration documentation, see [`doc/openai_integration.md`]
 
 ### Enhanced Security Architecture
 
-```
+```plaintext
 ┌─────────────────────────────────────────────────────────────┐
 │                    Security Layer                           │
 ├─────────────────────────────────────────────────────────────┤
@@ -432,22 +451,26 @@ CREATE TABLE challenges (
 ### Security Improvements Summary
 
 #### 🔒 Enhanced Cryptography
+
 - **PBKDF2-HMAC-SHA256**: Replaced simple SHA256 with proper key derivation
 - **User-Specific Salts**: Each user gets unique salt for passphrase derivation
 - **100,000 Iterations**: OWASP-recommended iteration count for key stretching
 
 #### 🛡️ Input Security
+
 - **Password Complexity**: Enforced strong password requirements
 - **Username Validation**: 3-50 characters, alphanumeric + underscore/hyphen
 - **Email Validation**: RFC-compliant email address validation
 - **File Upload Security**: Size limits and extension validation
 
 #### 🚦 Rate Limiting
+
 - **Authentication**: 5 attempts per minute per IP
 - **API Operations**: 30 requests per minute per IP
 - **Automatic Testing Bypass**: Disabled in testing environments
 
 #### 🔐 HTTP Security
+
 - **X-Frame-Options**: DENY (clickjacking protection)
 - **X-Content-Type-Options**: nosniff (MIME sniffing protection)
 - **X-XSS-Protection**: 1; mode=block (XSS protection)
@@ -521,7 +544,7 @@ services:
 
 ## 📁 Project Structure
 
-```
+```plaintext
 gpg-webservice/
 ├── app.py                 # Main Flask application with security middleware
 ├── docker-compose.yml     # Docker orchestration
@@ -595,6 +618,7 @@ The service automatically configures comprehensive security:
 ### Common Issues
 
 **Password Validation Errors**: Ensure passwords meet complexity requirements:
+
 - Minimum 8 characters
 - Mixed case letters, numbers, and special characters
 

@@ -1,12 +1,14 @@
 # GPG Webservice - Complete System
 
-A comprehensive, production-ready GPG (GNU Privacy Guard) service suite providing cryptographic operations via REST API, MCP (Model Context Protocol) server, and web dashboard.
+A comprehensive, production-ready GPG (GNU Privacy Guard) service suite
+providing cryptographic operations via a REST API, an MCP (Model
+Context Protocol) server, and a web dashboard.
 
 ## 🏗️ Architecture Overview
 
 This is a **multi-service system** consisting of three components:
 
-```
+```plaintext
 ┌─────────────────────────────────────────────────────────────┐
 │                    GPG Webservice Suite                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -18,11 +20,11 @@ This is a **multi-service system** consisting of three components:
 │  └────────┬─────────┘  └────────┬─────────┘  └─────┬────┘   │
 │           │                     │                   │       │
 │           └─────────────────────┴───────────────────┘       │
-│                              │                              │
-│                    ┌─────────▼─────────┐                    │
-│                    │  Shared Network   │                    │
-│                    │  (Docker Bridge)  │                    │
-│                    └───────────────────┘                    │
+│                                 │                           │
+│                       ┌─────────▼─────────┐                 │
+│                       │  Shared Network   │                 │
+│                       │  (Docker Bridge)  │                 │
+│                       └───────────────────┘                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -49,15 +51,14 @@ This is a **multi-service system** consisting of three components:
 
 ## 📁 Project Structure
 
-```
-gpg-webservice/                        # ← You are here (root)
-├── README.md                          # This file
-├── QUICKSTART.md                      # Step-by-step getting started
-├── docker-compose.yml                 # Orchestrates all 3 services
-├── docker-compose.dev.yml             # Development overrides
-├── .env.example                       # Environment template
+```plaintext
+gpg-webservice/                       # ← You are here (root)
+├── README.md                         # This file
+├── QUICKSTART.md                     # Step-by-step getting started
+├── docker-compose.yml                # Orchestrates all 3 services
+├── docker-compose.dev.yml            # Development overrides
+├── .env.example                      # Environment template
 ├── .env                              # Your config (create from .env.example)
-├── setup.sh                          # Automated setup script
 │
 ├── gpg-webservice-rest/              # Flask REST API
 │   ├── README.md                     # REST API documentation
@@ -77,7 +78,9 @@ gpg-webservice/                        # ← You are here (root)
 │   │   ├── gpg_command_builder_guide.md  # Builder pattern guide
 │   │   └── refactoring_changelog_2025.md # Recent improvements
 │   └── scripts/
+│       └── admin_gpg_auth.sh         # Admin GPG Authentication helper
 │       └── generate-secrets.sh       # Secret generation
+│       └── setup.sh                  # Automated setup script
 │
 ├── gpg-webservice-mcp/               # MCP Server
 │   ├── README.md
@@ -146,36 +149,44 @@ docker-compose logs -f
 ### Option 3: Automated Setup (Non-interactive)
 
 ```bash
-./setup.sh --auto
+./scripts/setup.sh --auto
 ```
 
 ## 📚 Documentation
 
 ### Quick Links
 
-| Document | Description |
-|----------|-------------|
-| [QUICKSTART.md](./QUICKSTART.md) | Detailed getting started guide |
-| [REST API Docs](./gpg-webservice-rest/README.md) | Complete REST API documentation |
-| [Architecture Guide](./gpg-webservice-rest/docs/architecture.md) | System architecture & design patterns |
-| [API Reference](./gpg-webservice-rest/docs/api_reference.md) | Endpoint documentation with examples |
-| [GPG Command Builder](./gpg-webservice-rest/docs/gpg_command_builder_guide.md) | Developer guide for GPG operations |
-| [MCP Server Docs](./gpg-webservice-mcp/README.md) | MCP server setup and usage |
-| [Dashboard Docs](./gpg-webservice-dashboard/README.md) | Web dashboard guide |
+|Document|Description|
+|--------|-----------|
+|[QUICKSTART.md](./QUICKSTART.md)|Detailed getting started guide|
+|[REST API Docs](./gpg-webservice-rest/README.md)|Complete REST API documentation|
+|[Architecture Guide](./gpg-webservice-rest/docs/architecture.md)|System architecture & design patterns|
+|[API Reference](./gpg-webservice-rest/docs/api_reference.md)|Endpoint documentation with examples|
+|[GPG Command Builder](./gpg-webservice-rest/docs/gpg_command_builder_guide.md)|Developer guide for GPG operations|
+|[MCP Server Docs](./gpg-webservice-mcp/README.md)|MCP server setup and usage|
+|[Dashboard Docs](./gpg-webservice-dashboard/README.md)|Web dashboard guide|
 
 ### For Different Audiences
 
 #### 🎯 API Users
+
 1. [QUICKSTART.md](./QUICKSTART.md) - Get up and running
-2. [API Reference](./gpg-webservice-rest/docs/api_reference.md) - All endpoints with examples
-3. Test with: `curl http://localhost:5555/openai/function_definitions`
+2. [API Reference](./gpg-webservice-rest/docs/api_reference.md)  
+  All endpoints with examples
+3. Test with:  
+  `curl http://localhost:5555/openai/function_definitions`
 
 #### 👨‍💻 Developers
-1. [Architecture Guide](./gpg-webservice-rest/docs/architecture.md) - Understand the system
-2. [Development Guide](./gpg-webservice-rest/docs/development.md) - Setup dev environment
-3. [Refactoring Changelog](./gpg-webservice-rest/docs/refactoring_changelog_2025.md) - Recent improvements
+
+1. [Architecture Guide](./gpg-webservice-rest/docs/architecture.md)  
+  Understand the system
+2. [Development Guide](./gpg-webservice-rest/docs/development.md)  
+  Setup dev environment
+3. [Refactoring Changelog](./gpg-webservice-rest/docs/refactoring_changelog_2025.md)  
+  Recent improvements
 
 #### 🔒 Security Reviewers
+
 1. [Security Architecture](./gpg-webservice-rest/docs/overview.md#security-architecture)
 2. [Threat Model](./gpg-webservice-rest/docs/security.md)
 3. [OWASP Compliance](./gpg-webservice-rest/docs/security.md#owasp-compliance)
@@ -310,6 +321,7 @@ curl -X POST http://localhost:5555/verify \
 ### Issue: "SERVICE_KEY_PASSPHRASE environment variable is required"
 
 **Solution**:
+
 ```bash
 cd gpg-webservice-rest
 ./scripts/generate-secrets.sh
@@ -319,6 +331,7 @@ docker-compose up -d
 ### Issue: "Port already in use"
 
 **Solution**:
+
 ```bash
 # Check what's using the port
 lsof -i :5555
@@ -331,6 +344,7 @@ docker-compose up -d
 ### Issue: "Container exits immediately"
 
 **Solution**:
+
 ```bash
 # Check logs for detailed error
 docker logs gpg-webservice
@@ -344,6 +358,7 @@ docker logs gpg-webservice
 ### Issue: "GPG operations failing"
 
 **Solution**:
+
 ```bash
 # Reset GPG environment
 docker-compose down
@@ -382,22 +397,28 @@ git push origin main
 # 2. Connect repository to Render
 # 3. Render will auto-deploy using .render.yaml
 
-# Configuration is in: gpg-webservice-rest/.render.yaml
+# Configuration is in:
+# gpg-webservice-rest/.render.yaml
 ```
 
-See [DEPLOYMENT.md](./gpg-webservice-rest/DEPLOYMENT.md) for detailed production setup.
+See [DEPLOYMENT.md](./gpg-webservice-rest/DEPLOYMENT.md) for detailed
+production setup.
 
 ## 🔐 Security Features
 
-- **Deterministic Session Keys**: Stateless authentication ideal for AI agents (hourly rotation)
-- **Argon2id Password Hashing**: OWASP-recommended (4 iterations, 64MB memory)
+- **Deterministic Session Keys**: Stateless authentication ideal for AI
+  agents (hourly rotation)
+- **Argon2id Password Hashing**: OWASP-recommended (4 iterations,
+  64MB memory)
 - **AES-256-GCM Encryption**: For private key storage
 - **PBKDF2-HMAC-SHA256**: 100,000 iterations for key derivation
 - **Rate Limiting**: Protection against brute force attacks
-- **Process Isolation**: GPG operations in isolated temporary directories
+- **Process Isolation**: GPG operations in isolated temporary
+  directories
 - **Input Validation**: Comprehensive validation on all inputs
 - **Security Headers**: HSTS, CSP, X-Frame-Options, etc.
-- **No Secret Storage**: Session keys derived mathematically, not stored in database
+- **No Secret Storage**: Session keys derived mathematically, not
+  stored in database
 
 ## 🤝 Contributing
 
@@ -414,7 +435,7 @@ MIT License - See [LICENSE](./gpg-webservice-rest/LICENSE)
 ## 🔗 Links
 
 - **Documentation**: [./gpg-webservice-rest/docs/](./gpg-webservice-rest/docs/)
-- **Issue Tracker**: <repository-issues-url>
+- **Issue Tracker**: `https://github.com/dtrog/gpg-webservice/issues`
 - **Changelog**: [./gpg-webservice-rest/CHANGES.md](./gpg-webservice-rest/CHANGES.md)
 
 ## 📞 Support
@@ -429,13 +450,13 @@ MIT License - See [LICENSE](./gpg-webservice-rest/LICENSE)
 **Quick Commands Cheat Sheet:**
 
 ```bash
-./setup.sh                  # Interactive setup
-./setup.sh --auto           # Automated setup
-docker-compose up -d        # Start all services
-docker-compose logs -f      # View logs
-docker-compose ps           # Check status
-docker-compose down         # Stop services
-docker-compose run --rm test-runner  # Run tests
+./scripts/setup.sh
+./scripts/setup.sh --auto
+docker-compose up -d
+docker-compose logs -f
+docker-compose ps
+docker-compose down
+docker-compose run --rm test-runner
 ```
 
-**Made with ❤️ using Flask, Node.js, and GPG**
+**Made with ❤️** using **Flask**, **Node.js**, **GPG**

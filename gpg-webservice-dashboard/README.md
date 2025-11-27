@@ -64,6 +64,7 @@ docker-compose up gpg-dashboard
 ## Configuration
 
 The dashboard automatically detects the API endpoint:
+
 - **Development**: `http://localhost:5555` (default Flask port)
 - **Production**: Uses same origin as dashboard
 
@@ -106,21 +107,24 @@ const API_BASE = 'https://localhost';
 
 **Access**: `/admin.html`
 
-**⚠️ IMPORTANT: Admin Access Control**
+#### ⚠️ IMPORTANT: Admin Access Control
 
 Admin functions require proper authorization. To designate admin users:
 
 1. **Set the `ADMIN_USERNAMES` environment variable** (comma-separated list):
+
    ```bash
    export ADMIN_USERNAMES="alice,bob,administrator"
    ```
 
 2. **In docker-compose**, add to `.env` file:
+
    ```bash
    ADMIN_USERNAMES=alice,bob,administrator
    ```
 
 3. **Restart the REST API service**:
+
    ```bash
    docker compose restart gpg-webservice-rest
    ```
@@ -128,6 +132,7 @@ Admin functions require proper authorization. To designate admin users:
 **Without setting `ADMIN_USERNAMES`, admin endpoints will return 403 Forbidden.**
 
 Features:
+
 - **List All Users** - View all registered users (no auth required)
 - **Delete User** - Remove individual users (requires admin session key)
 - **Bulk Delete** - Delete multiple users at once (requires admin session key)
@@ -135,6 +140,7 @@ Features:
 **Authentication**: Only users listed in `ADMIN_USERNAMES` can perform delete operations.
 
 **Usage**:
+
 1. Register with a username listed in `ADMIN_USERNAMES`
 2. Login to get your session key (starts with `sk_`)
 3. Navigate to `/admin.html`
@@ -163,6 +169,7 @@ Features:
 ### nginx Configuration
 
 The included `nginx.conf`:
+
 - Serves static files
 - Proxies `/api/*` to backend
 - Enables gzip compression
@@ -187,7 +194,7 @@ docker-compose up gpg-dashboard
 
 ## File Structure
 
-```
+```plaintext
 gpg-webservice-dashboard/
 ├── index.html          # Landing page
 ├── register.html       # Registration form

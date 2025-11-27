@@ -17,10 +17,10 @@ docker-compose logs -f
 # Stop
 docker-compose down
 ```
-FFE
+
 ## Custom Ports
 
-``                                                               v53E`bash
+```bash
 # Create .env file
 cat > .env <<EOF
 FLASK_PORT=8000
@@ -37,13 +37,13 @@ curl http://localhost:4000/health
 
 ## Service URLs
 
-| Service | URL | Description |
+|Service|URL|Description|
 |---------|-----|-------------|
-| **Landing Page** | http://localhost:5555 | Main website |
-| **Swagger UI** | http://localhost:5555/swagger-ui | API documentation |
-| **OpenAI Functions** | http://localhost:5555/openai.json | AI function specs |
-| **MCP Health** | http://localhost:3000/health | MCP status check |
-| **MCP Endpoint** | http://localhost:3000/mcp | For AI agents |
+|**Landing Page**| `http://localhost:5555`|Main website|
+|**Swagger UI**|http://localhost:5555/swagger-ui|API documentation|
+|**OpenAI Functions**|http://localhost:5555/openai.json|AI function specs|
+|**MCP Health**|http://localhost:3000/health|MCP status check|
+|**MCP Endpoint**|http://localhost:3000/mcp|For AI agents|
 
 ## Testing
 
@@ -107,6 +107,7 @@ MCP_PORT=3000           # Port mapping
 ## Troubleshooting
 
 **Port conflict?**
+
 ```bash
 # Change ports in .env
 FLASK_PORT=8000
@@ -115,6 +116,7 @@ docker-compose up -d
 ```
 
 **MCP can't reach Flask?**
+
 ```bash
 # Check Flask is healthy
 docker-compose ps
@@ -125,6 +127,7 @@ docker-compose logs gpg-mcp-server
 ```
 
 **Need to rebuild?**
+
 ```bash
 docker-compose down
 docker-compose build
@@ -140,22 +143,26 @@ docker-compose up -d
 **Solution Steps**:
 
 1. **Verify .env file exists**:
+
    ```bash
    ls -la .env
    ```
 
 2. **Generate secrets if missing**:
+
    ```bash
    ./scripts/generate-secrets.sh
    ```
 
 3. **Verify variable is set** in .env:
+
    ```bash
    grep SERVICE_KEY_PASSPHRASE .env
    # Should show: SERVICE_KEY_PASSPHRASE=<long-random-string>
    ```
 
 4. **Check docker-compose.yml** has `env_file`:
+
    ```yaml
    services:
      gpg-webservice:
@@ -164,12 +171,14 @@ docker-compose up -d
    ```
 
 5. **Restart with explicit environment loading**:
+
    ```bash
    docker-compose down
    docker-compose up -d
    ```
 
 6. **Verify container received the variable**:
+
    ```bash
    docker exec gpg-webservice-rest-gpg-webservice-1 env | grep SERVICE_KEY_PASSPHRASE
    ```
@@ -177,19 +186,20 @@ docker-compose up -d
 #### Container Builds But Exits Immediately
 
 **Check logs**:
+
 ```bash
 docker logs gpg-webservice-rest-gpg-webservice-1
 ```
 
 **Common causes and fixes**:
 
-| Error in Logs | Cause | Fix |
+|Error in Logs|Cause|Fix|
 |---------------|-------|-----|
-| "SERVICE_KEY_PASSPHRASE... required" | Missing env var | Run `./scripts/generate-secrets.sh` |
-| "No such file or directory: '.env'" | Missing .env file | `cp .env.example .env` |
-| "Permission denied" | Volume mount permissions | `chmod 755 gpg_users.db` or delete and recreate |
-| "Port already in use" | Port conflict | Change FLASK_PORT in .env |
-| "ModuleNotFoundError" | Incomplete build | `docker-compose build --no-cache` |
+|"SERVICE_KEY_PASSPHRASE... required"|Missing env var|Run `./scripts/generate-secrets.sh`|
+|"No such file or directory: '.env'"|Missing .env file|`cp .env.example .env`|
+|"Permission denied"|Volume mount permissions|`chmod 755 gpg_users.db` or delete and recreate|
+|"Port already in use"|Port conflict|Change FLASK_PORT in .env|
+|"ModuleNotFoundError"|Incomplete build|`docker-compose build --no-cache`|
 
 #### Best Practice: Use Root-Level docker-compose.yml
 
@@ -206,6 +216,7 @@ docker-compose up -d
 ```
 
 The root-level `docker-compose.yml` handles:
+
 - Proper environment variable inheritance
 - All 3 services with correct dependencies
 - Shared networking
@@ -221,6 +232,7 @@ Docker Compose loads environment variables in this order (highest priority first
 4. **Shell environment** variables
 
 Example from root `docker-compose.yml`:
+
 ```yaml
 services:
   gpg-webservice:
