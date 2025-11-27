@@ -15,9 +15,7 @@ services:
   - type: web
     name: gpg-webservice-rest
     runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerBuildArgs:
-      SERVICE: rest
+    dockerfilePath: ./Dockerfile.rest
     plan: starter
     region: oregon
     branch: main
@@ -90,9 +88,7 @@ services:
   - type: web
     name: gpg-webservice-mcp
     runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerBuildArgs:
-      SERVICE: mcp
+    dockerfilePath: ./Dockerfile.mcp
     plan: starter
     region: oregon
     branch: main
@@ -121,9 +117,7 @@ services:
   - type: web
     name: gpg-webservice-dashboard
     runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerBuildArgs:
-      SERVICE: dashboard
+    dockerfilePath: ./Dockerfile.dashboard
     plan: starter
     region: oregon
     branch: main
