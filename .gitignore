@@ -57,3 +57,4 @@ claude-*.log
 use-case/
 gpg-webservice-rest/gpg_users.db⁠
 .render.yaml
+.hintrc

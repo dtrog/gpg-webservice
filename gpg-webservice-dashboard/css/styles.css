@@ -79,6 +79,18 @@ body {
     font-size: 0.85rem;
 }
 
+/* Small monospace textarea used for tokens and short PGP blobs */
+.monospace-textarea {
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 8px 10px;
+}
+
+/* Small utility class for logout spacing */
+.logout-btn {
+    margin-left: 10px;
+}
+
 .form-group input[type="file"] {
     display: none;
 }
