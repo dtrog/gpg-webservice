@@ -36,7 +36,8 @@ config();
 export function getConfig(): MCPConfig & { port: number; host: string } {
   const gpgApiBase = process.env.GPG_API_BASE || 'http://localhost:5000';
   const gpgApiKey = process.env.GPG_API_KEY;
-  const port = parseInt(process.env.MCP_PORT || '3000', 10);
+  // Render provides PORT, but we also support MCP_PORT for local dev
+  const port = parseInt(process.env.MCP_PORT || process.env.PORT || '3000', 10);
   const host = process.env.MCP_HOST || '0.0.0.0';
 
   // Ensure base URL doesn't have trailing slash

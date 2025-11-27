@@ -23,8 +23,6 @@ services:
     
     # Render sets PORT automatically; service listens on this port
     envVars:
-      - key: PORT
-        value: 5555
       - key: HOST
         value: 0.0.0.0
       - key: FLASK_ENV
@@ -98,8 +96,7 @@ services:
     branch: main
     
     envVars:
-      - key: MCP_PORT
-        value: 3000
+      # Render automatically sets PORT; MCP service will use it
       - key: MCP_HOST
         value: 0.0.0.0
       
@@ -129,14 +126,7 @@ services:
     branch: main
     
     envVars:
-      # Render provides PORT env var automatically (usually 10000)
-      # nginx.conf.template uses this via envsubst
-      - key: PORT
-        fromService:
-          type: web
-          name: gpg-webservice-dashboard
-          property: port
-      
+      # Render automatically sets PORT; nginx.conf.template uses it via envsubst
       # API endpoint for dashboard to connect to REST service
       # Update after REST service is deployed
       - key: API_URL
