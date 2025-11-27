@@ -4,11 +4,11 @@
 
 ### 1. Deploy to Render
 
-1. Push code to GitHub (including `render.yaml`)
+1. Push code to GitHub (including `.render.yaml`)
 2. Go to [Render Dashboard](https://dashboard.render.com/)
 3. Click **"New"** → **"Blueprint"**
 4. Connect your GitHub repository
-5. Render detects `render.yaml` and shows 3 services:
+5. Render detects `.render.yaml` and shows 3 services:
    - `gpg-webservice-rest` (Flask API)
    - `gpg-webservice-mcp` (MCP Server)
    - `gpg-webservice-dashboard` (Web UI)
