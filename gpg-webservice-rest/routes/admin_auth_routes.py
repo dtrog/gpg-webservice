@@ -286,7 +286,7 @@ def auth_info():
         'challenge_validity_seconds': CHALLENGE_VALIDITY_SECONDS,
         'configured_admins': list(admin_keys.keys()),
         'flow': [
-            '1. POST /admin/auth/challenge with {"username": "admin"}',
+            '1. POST /admin/auth/challenge with {"username": "administrator"}',
             '2. Sign the returned challenge with your GPG private key',
             '3. POST /admin/auth/verify with signature',
             '4. Use returned token in X-Admin-Token header'

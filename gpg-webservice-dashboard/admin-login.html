@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - GPG Web Service</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Administrator Authentication</h1>
+            <p>GPG-based authentication for Imperator access</p>
+        </header>
+
+        <div class="card">
+            <h2>Instructions</h2>
+            <ol>
+                <li>Run the authentication script locally:
+                    <pre><code>python3 scripts/admin_gpg_auth.py login administrator imperator</code></pre>
+                </li>
+                <li>Sign the challenge with your GPG private key</li>
+                <li>Copy the admin token from the output or from:
+                    <pre><code>cat ~/.gpg-webservice-admin-token</code></pre>
+                </li>
+                <li>Paste the token below</li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <h2>Enter Admin Token</h2>
+            <form id="adminLoginForm">
+                <div class="form-group">
+                    <label for="adminToken">Admin Token (24h validity):</label>
+                    <textarea 
+                        id="adminToken" 
+                        rows="3" 
+                        placeholder="admin_administrator_1234567890_abc123..." 
+                        required
+                        style="font-family: monospace; font-size: 0.9em;"
+                    ></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Authenticate</button>
+            </form>
+        </div>
+
+        <div id="resultArea" class="result-area"></div>
+
+        <footer>
+            <a href="index.html">← Back to Home</a>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const token = document.getElementById('adminToken').value.trim();
+            const resultArea = document.getElementById('resultArea');
+            
+            if (!token) {
+                resultArea.innerHTML = '<p class="error">❌ Please enter an admin token</p>';
+                return;
+            }
+
+            if (!token.startsWith('admin_')) {
+                resultArea.innerHTML = '<p class="error">❌ Invalid token format (should start with "admin_")</p>';
+                return;
+            }
+
+            try {
+                resultArea.innerHTML = '<p class="loading">⏳ Verifying admin token...</p>';
+                
+                // Test the token by fetching admin auth info
+                const response = await fetch(`${API_BASE}/admin/auth/info`, {
+                    headers: {
+                        'X-Admin-Token': token
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Token verification failed');
+                }
+
+                // Token is valid - store it and redirect
+                storeAdminToken(token);
+                resultArea.innerHTML = '<p class="success">✅ Authentication successful! Redirecting...</p>';
+                
+                setTimeout(() => {
+                    window.location.href = 'admin.html';
+                }, 1000);
+                
+            } catch (error) {
+                resultArea.innerHTML = `<p class="error">❌ Authentication failed: ${error.message}</p>`;
+            }
+        });
+
+        // Auto-fill token if provided in URL (for convenience)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenParam = urlParams.get('token');
+        if (tokenParam) {
+            document.getElementById('adminToken').value = tokenParam;
+        }
+
+        // Check if already authenticated
+        if (getAdminToken()) {
+            document.getElementById('resultArea').innerHTML = 
+                '<p class="warning">⚠️ Already authenticated. <a href="admin.html">Go to Admin Panel</a></p>';
+        }
+    </script>
+</body>
+</html>

@@ -11,6 +11,10 @@
         <header>
             <h1>🔧 Admin Panel</h1>
             <p>Manage users and system operations</p>
+            <div class="admin-info">
+                <span id="adminUsername"></span>
+                <button onclick="logout()" class="btn btn-secondary" style="margin-left: 10px;">Logout</button>
+            </div>
         </header>
 
         <div class="admin-section">
@@ -29,10 +33,6 @@
                     <label for="deleteUsername">Username:</label>
                     <input type="text" id="deleteUsername" placeholder="Enter username">
                 </div>
-                <div class="form-group">
-                    <label for="adminApiKey">Admin API Key:</label>
-                    <input type="password" id="adminApiKey" placeholder="Enter your API key">
-                </div>
                 <button onclick="deleteUser()" class="btn btn-danger">Delete User</button>
             </div>
 
@@ -42,10 +42,6 @@
                 <div class="form-group">
                     <label for="bulkUsernames">Usernames:</label>
                     <textarea id="bulkUsernames" rows="5" placeholder="PrimeAI&#10;Auditor_Alpha&#10;Auditor_Beta"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="bulkAdminApiKey">Admin API Key:</label>
-                    <input type="password" id="bulkAdminApiKey" placeholder="Enter your API key">
                 </div>
                 <button onclick="bulkDeleteUsers()" class="btn btn-danger">Bulk Delete</button>
             </div>
@@ -60,6 +56,35 @@
 
     <script src="js/app.js"></script>
     <script>
+        // Check admin authentication on page load
+        if (!checkAdminAuth()) {
+            // Will redirect to admin-login.html
+        }
+
+        // Display admin info
+        async function loadAdminInfo() {
+            try {
+                const response = await authenticatedAdminFetch(`${API_BASE}/admin/auth/info`);
+                const data = await response.json();
+                
+                if (response.ok && data.configured_admins && data.configured_admins.length > 0) {
+                    document.getElementById('adminUsername').textContent = 
+                        `👤 ${data.configured_admins[0]} (Imperator)`;
+                }
+            } catch (error) {
+                console.error('Failed to load admin info:', error);
+            }
+        }
+
+        loadAdminInfo();
+
+        function logout() {
+            if (confirm('Logout from admin panel?')) {
+                clearAdminToken();
+                window.location.href = 'admin-login.html';
+            }
+        }
+
         async function listUsers() {
             const resultArea = document.getElementById('resultArea');
             const userList = document.getElementById('userList');
@@ -113,16 +138,10 @@
 
         async function deleteUser() {
             const username = document.getElementById('deleteUsername').value.trim();
-            const apiKey = document.getElementById('adminApiKey').value.trim();
             const resultArea = document.getElementById('resultArea');
             
             if (!username) {
                 resultArea.innerHTML = '<p class="error">❌ Please enter a username</p>';
-                return;
-            }
-            
-            if (!apiKey) {
-                resultArea.innerHTML = '<p class="error">❌ Please enter your API key</p>';
                 return;
             }
 
@@ -133,11 +152,10 @@
             try {
                 resultArea.innerHTML = '<p class="loading">⏳ Deleting user...</p>';
                 
-                const response = await fetch(`${API_BASE}/admin/users/${username}`, {
+                const response = await authenticatedAdminFetch(`${API_BASE}/admin/users/${username}`, {
                     method: 'DELETE',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-KEY': apiKey
+                        'Content-Type': 'application/json'
                     }
                 });
 
@@ -164,16 +182,10 @@
                 .split('\n')
                 .map(u => u.trim())
                 .filter(u => u);
-            const apiKey = document.getElementById('bulkAdminApiKey').value.trim();
             const resultArea = document.getElementById('resultArea');
             
             if (usernames.length === 0) {
                 resultArea.innerHTML = '<p class="error">❌ Please enter at least one username</p>';
-                return;
-            }
-            
-            if (!apiKey) {
-                resultArea.innerHTML = '<p class="error">❌ Please enter your API key</p>';
                 return;
             }
 
@@ -186,11 +198,10 @@
                 
                 const results = [];
                 for (const username of usernames) {
-                    const response = await fetch(`${API_BASE}/admin/users/${username}`, {
+                    const response = await authenticatedAdminFetch(`${API_BASE}/admin/users/${username}`, {
                         method: 'DELETE',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-API-KEY': apiKey
+                            'Content-Type': 'application/json'
                         }
                     });
 

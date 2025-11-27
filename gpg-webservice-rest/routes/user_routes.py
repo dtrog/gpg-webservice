@@ -25,6 +25,10 @@ def register():
     """
     Register a new user with deterministic session keys.
 
+    Requires admin signature for authorization:
+    - admin_signature: Base64-encoded PGP signature of the username
+    - Server verifies signature against ADMIN_GPG_KEYS
+
     The password should be SHA256(successorship_contract + pgp_signature).
     This allows AI agents to regenerate their password from their immutable contract.
 
@@ -40,10 +44,14 @@ def register():
     username = data.get('username')
     password = data.get('password')
     email = data.get('email')
+    admin_signature = data.get('admin_signature')  # Required for authorization
 
     # Validate input
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
+    
+    if not admin_signature:
+        return jsonify({'error': 'Admin signature required for registration'}), 400
 
     valid, error = validate_username(username)
     if not valid:
@@ -57,6 +65,37 @@ def register():
         valid, error = validate_email(email)
         if not valid:
             return jsonify({'error': error}), 400
+
+    # Verify admin signature authorizes this username
+    from routes.admin_auth_routes import get_admin_gpg_keys
+    from utils.gpg_utils import verify_gpg_signature
+    
+    admin_keys = get_admin_gpg_keys()
+    if not admin_keys:
+        return jsonify({'error': 'Admin authorization not configured'}), 500
+    
+    # Try each admin's public key
+    signature_valid = False
+    authorizing_admin = None
+    
+    for admin_username, public_key in admin_keys.items():
+        is_valid, error_msg = verify_gpg_signature(username, admin_signature, public_key)
+        if is_valid:
+            signature_valid = True
+            authorizing_admin = admin_username
+            break
+    
+    if not signature_valid:
+        audit_logger.log_event(
+            AuditEventType.REGISTRATION,
+            status='failure',
+            username=username,
+            message=f'Registration denied for {username}: Invalid admin signature'
+        )
+        return jsonify({
+            'error': 'Invalid admin signature',
+            'hint': 'Admin must sign username with: echo "username" | gpg --armor --detach-sign'
+        }), 403
 
     public_key_data = data.get('public_key')  # Optional
     private_key_data = data.get('private_key')  # Optional
@@ -74,11 +113,18 @@ def register():
         )
         return jsonify({'error': error}), 400
 
-    # Log successful registration
+    # Log successful registration with authorizing admin
     audit_logger.log_registration(
         user_id=registration_result.user.id,
         username=username,
         email=email
+    )
+    audit_logger.log_event(
+        AuditEventType.REGISTRATION,
+        status='success',
+        user_id=registration_result.user.id,
+        username=username,
+        message=f'Registration authorized by admin: {authorizing_admin}'
     )
 
     # Safely determine the public key to return
@@ -92,6 +138,7 @@ def register():
         'message': 'User registered with deterministic session keys',
         'user_id': registration_result.user.id,
         'username': username,
+        'authorized_by': authorizing_admin,
         'api_key': session_info.api_key,  # Derived session key (sk_...)
         'session_window': session_info.window_index,
         'window_start': session_info.window_start,
@@ -160,19 +207,22 @@ def login():
 @user_bp.route('/register/form', methods=['POST'])
 @rate_limit_auth
 def register_form():
-    """Form-based registration endpoint that accepts multipart/form-data"""
-    from werkzeug.utils import secure_filename
-    import tempfile
-    import os
-
+    """Form-based registration endpoint that accepts multipart/form-data
+    
+    Requires admin signature for authorization.
+    """
     # Get form data
     username = request.form.get('username')
     password = request.form.get('password')
     email = request.form.get('email')
+    admin_signature = request.form.get('admin_signature')  # Required
 
     # Validate input
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
+    
+    if not admin_signature:
+        return jsonify({'error': 'Admin signature required'}), 400
 
     valid, error = validate_username(username)
     if not valid:
@@ -186,6 +236,35 @@ def register_form():
         valid, error = validate_email(email)
         if not valid:
             return jsonify({'error': error}), 400
+
+    # Verify admin signature
+    from routes.admin_auth_routes import get_admin_gpg_keys
+    from utils.gpg_utils import verify_gpg_signature
+    
+    admin_keys = get_admin_gpg_keys()
+    if not admin_keys:
+        return jsonify({'error': 'Admin authorization not configured'}), 500
+    
+    signature_valid = False
+    authorizing_admin = None
+    
+    for admin_username, public_key in admin_keys.items():
+        is_valid, _ = verify_gpg_signature(
+            username, admin_signature, public_key
+        )
+        if is_valid:
+            signature_valid = True
+            authorizing_admin = admin_username
+            break
+    
+    if not signature_valid:
+        audit_logger.log_event(
+            AuditEventType.REGISTRATION,
+            status='failure',
+            username=username,
+            message=f'Registration denied: Invalid admin signature'
+        )
+        return jsonify({'error': 'Invalid admin signature'}), 403
 
     # Handle optional PGP key uploads
     public_key_data = None
@@ -204,12 +283,15 @@ def register_form():
         private_key_file = request.files['private_key_file']
         if private_key_file.filename:
             private_key_data = private_key_file.read().decode('utf-8')
-    elif 'private_key_text' in request.form and request.form['private_key_text']:
-        private_key_data = request.form.get('private_key_text')
+    elif 'private_key_text' in request.form:
+        if request.form['private_key_text']:
+            private_key_data = request.form.get('private_key_text')
 
     # Register user
     user_service = UserService()
-    registration_result, error = user_service.register_user(username, password, public_key_data, private_key_data)
+    registration_result, error = user_service.register_user(
+        username, password, public_key_data, private_key_data
+    )
 
     if error:
         # Log registration failure
@@ -227,6 +309,13 @@ def register_form():
         username=username,
         email=email
     )
+    audit_logger.log_event(
+        AuditEventType.REGISTRATION,
+        status='success',
+        user_id=registration_result.user.id,
+        username=username,
+        message=f'Registration authorized by: {authorizing_admin}'
+    )
 
     # Safely determine the public key to return
     public_key = public_key_data
@@ -236,15 +325,16 @@ def register_form():
     # Return session key info
     session_info = registration_result.session_key_info
     return jsonify({
-        'message': 'User registered successfully with deterministic session keys',
+        'message': 'User registered successfully',
         'user_id': registration_result.user.id,
         'username': username,
+        'authorized_by': authorizing_admin,
         'api_key': session_info.api_key,
         'session_window': session_info.window_index,
         'window_start': session_info.window_start,
         'expires_at': session_info.expires_at,
         'public_key': public_key,
-        'note': 'Session key expires hourly. Use /login to get a fresh key when expired.'
+        'note': 'Session key expires hourly. Use /login to refresh.'
     }), 201
 
 

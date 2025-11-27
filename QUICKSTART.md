@@ -69,6 +69,7 @@ cd gpg-webservice
 ```
 
 **Non-interactive mode** (for CI/CD or scripting):
+
 ```bash
 ./setup.sh --auto
 ```
@@ -115,6 +116,7 @@ cp .env.example .env
 ```
 
 **Manual secret generation** (if script doesn't work):
+
 ```bash
 # Generate SERVICE_KEY_PASSPHRASE
 echo "SERVICE_KEY_PASSPHRASE=$(openssl rand -base64 32)" >> .env
@@ -165,9 +167,9 @@ docker-compose ps
 Expected output:
 ```
 NAME                    STATE      PORTS
-gpg-webservice         Up         0.0.0.0:5555->5555/tcp
-gpg-mcp-server         Up         0.0.0.0:3000->3000/tcp
-gpg-dashboard          Up         0.0.0.0:8080->80/tcp
+gpg-webservice          Up         0.0.0.0:5555->5555/tcp
+gpg-mcp-server          Up         0.0.0.0:3000->3000/tcp
+gpg-dashboard           Up         0.0.0.0:8080->80/tcp
 ```
 
 ### 2. Health Check Endpoints
@@ -185,8 +187,8 @@ curl http://localhost:8080/health
 
 ### 3. Access Web Interfaces
 
-- **Dashboard**: Open browser to http://localhost:8080
-- **API Docs**: http://localhost:5555/openai/function_definitions
+- **Dashboard**: Open browser to `http://localhost:8080`
+- **API Docs**: `http://localhost:5555/openai/function_definitions`
 
 ---
 
@@ -205,6 +207,7 @@ curl -X POST http://localhost:5555/register \
 ```
 
 **Expected response**:
+
 ```json
 {
   "username": "alice",
@@ -242,6 +245,7 @@ curl -X POST http://localhost:5555/verify \
 ```
 
 **Expected response**:
+
 ```json
 {
   "valid": true,
@@ -292,6 +296,7 @@ Navigate to: http://localhost:8080
 **Cause**: Missing required environment variable
 
 **Solution**:
+
 ```bash
 cd gpg-webservice-rest
 ./scripts/generate-secrets.sh
@@ -306,6 +311,7 @@ docker-compose restart
 **Cause**: Another service is using ports 5555, 3000, or 8080
 
 **Solution Option A** - Stop conflicting service:
+
 ```bash
 # Find what's using the port
 lsof -i :5555
@@ -313,6 +319,7 @@ lsof -i :5555
 ```
 
 **Solution Option B** - Change port:
+
 ```bash
 # Edit gpg-webservice-rest/.env
 echo "FLASK_PORT=5556" >> gpg-webservice-rest/.env
@@ -329,6 +336,7 @@ docker-compose up -d
 **Cause**: Configuration error or missing dependencies
 
 **Solution**:
+
 ```bash
 # Check logs for detailed error
 docker logs gpg-webservice
@@ -357,6 +365,7 @@ docker-compose up -d --build
 **Cause**: Docker Compose V1 vs V2 naming
 
 **Solution**:
+
 ```bash
 # Try with space (Compose V2)
 docker compose up -d
@@ -372,6 +381,7 @@ pip install docker-compose
 **Cause**: Docker volume permissions mismatch
 
 **Solution**:
+
 ```bash
 # Reset database and volumes
 docker-compose down -v
@@ -386,6 +396,7 @@ docker-compose up -d
 **Cause**: GPG environment corruption
 
 **Solution**:
+
 ```bash
 # Reset GPG temporary directories
 docker-compose down
@@ -400,6 +411,7 @@ docker-compose up -d
 **Cause**: Incomplete Docker build
 
 **Solution**:
+
 ```bash
 # Force rebuild
 docker-compose down
@@ -469,6 +481,7 @@ docker-compose down -v && rm -f gpg-webservice-rest/gpg_users.db
 ---
 
 **Estimated Setup Time Summary:**
+
 - Automated setup: **3-5 minutes**
 - Manual setup: **5-10 minutes**
 - First API call: **2 minutes**

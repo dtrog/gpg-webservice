@@ -117,6 +117,20 @@ function getApiKey() {
 
 function clearSession() {
     sessionStorage.removeItem('gpg_api_key');
+    sessionStorage.removeItem('gpg_admin_token');
+}
+
+// Admin token management (GPG-based authentication)
+function storeAdminToken(token) {
+    sessionStorage.setItem('gpg_admin_token', token);
+}
+
+function getAdminToken() {
+    return sessionStorage.getItem('gpg_admin_token');
+}
+
+function clearAdminToken() {
+    sessionStorage.removeItem('gpg_admin_token');
 }
 
 // Check if user is authenticated
@@ -124,6 +138,16 @@ function checkAuth() {
     const apiKey = getApiKey();
     if (!apiKey) {
         window.location.href = 'login.html';
+        return false;
+    }
+    return true;
+}
+
+// Check if admin is authenticated (GPG token required)
+function checkAdminAuth() {
+    const adminToken = getAdminToken();
+    if (!adminToken) {
+        window.location.href = 'admin-login.html';
         return false;
     }
     return true;
@@ -139,6 +163,24 @@ async function authenticatedFetch(url, options = {}) {
     const headers = {
         ...options.headers,
         'X-API-KEY': apiKey
+    };
+
+    return fetch(url, {
+        ...options,
+        headers
+    });
+}
+
+// Make authenticated admin API requests (using GPG token)
+async function authenticatedAdminFetch(url, options = {}) {
+    const adminToken = getAdminToken();
+    if (!adminToken) {
+        throw new Error('Admin authentication required');
+    }
+
+    const headers = {
+        ...options.headers,
+        'X-Admin-Token': adminToken
     };
 
     return fetch(url, {
@@ -234,7 +276,12 @@ if (typeof module !== 'undefined' && module.exports) {
         getApiKey,
         clearSession,
         checkAuth,
+        checkAdminAuth,
         authenticatedFetch,
+        authenticatedAdminFetch,
+        storeAdminToken,
+        getAdminToken,
+        clearAdminToken,
         formatFileSize,
         copyToClipboard,
         handleFetchResponse
