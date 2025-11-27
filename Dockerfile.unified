@@ -28,7 +28,7 @@ COPY gpg-webservice-rest/ /app/rest/
 COPY gpg-webservice-mcp/package*.json /app/mcp/
 COPY gpg-webservice-mcp/tsconfig.json /app/mcp/
 WORKDIR /app/mcp
-RUN npm ci
+RUN npm install
 COPY gpg-webservice-mcp/src /app/mcp/src
 RUN npm run build && npm prune --production
 
