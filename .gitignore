@@ -60,3 +60,10 @@ gpg-webservice-rest/gpg_users.db⁠
 .hintrc
 .vscode/settings.json
 gpg-webservice-mcp/package-lock.json
+gpg-webservice-mcp/node_modules/
+gpg-webservice-mcp/dist/
+gpg-webservice-mcp/build/
+gpg-webservice-mcp/package-lock.json
+
+.vscode
+gpg-webservice-rest/.claude
