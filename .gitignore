@@ -35,3 +35,23 @@ ENV/
 node_modules/
 dist/
 build/
+
+# lock files
+package-lock.json
+yarn.lock
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Claude specific
+claude-local-*.json
+claude-*.log
+.claude-cache/
+.claude/
+
+
+# custom use cases
+use-case/
