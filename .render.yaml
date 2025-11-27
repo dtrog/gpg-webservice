@@ -17,7 +17,7 @@ services:
     runtime: docker
     dockerfilePath: ./gpg-webservice-rest/Dockerfile
     dockerContext: ./gpg-webservice-rest
-    plan: free  # or: starter, standard, pro
+    plan: starter  # or: starter, standard, pro
     region: oregon  # or your preferred region
     branch: main
     
@@ -93,7 +93,7 @@ services:
     runtime: docker
     dockerfilePath: ./gpg-webservice-mcp/Dockerfile
     dockerContext: ./gpg-webservice-mcp
-    plan: free
+    plan: starter
     region: oregon
     branch: main
     
@@ -124,17 +124,25 @@ services:
     runtime: docker
     dockerfilePath: ./gpg-webservice-dashboard/Dockerfile
     dockerContext: ./gpg-webservice-dashboard
-    plan: free
+    plan: starter
     region: oregon
     branch: main
     
     envVars:
+      # Render provides PORT env var automatically (usually 10000)
+      # nginx.conf.template uses this via envsubst
+      - key: PORT
+        fromService:
+          type: web
+          name: gpg-webservice-dashboard
+          property: port
+      
       # API endpoint for dashboard to connect to REST service
       # Update after REST service is deployed
       - key: API_URL
         sync: false  # Set to https://gpg-webservice-rest.onrender.com
     
-    # Nginx listens on port 80 inside container; Render proxies this
+    # Nginx listens on $PORT inside container; Render proxies this
     # No healthCheckPath needed (static files always available)
     
     autoDeploy: true

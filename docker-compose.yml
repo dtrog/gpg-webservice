@@ -108,11 +108,13 @@ services:
       - "${DASHBOARD_PORT:-8080}:80"
       - "${DASHBOARD_SECURE_PORT:-8443}:443"
     volumes:
+      # For local HTTPS: mount SSL nginx.conf and certificates
       - ./gpg-webservice-dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs/dashboard.pem:/etc/ssl/certs/dashboard.pem:ro
       - ./certs/dashboard-key.pem:/etc/ssl/private/dashboard-key.pem:ro
     environment:
       - API_URL=${API_URL:-http://localhost:5555}
+      # PORT env var not needed locally - nginx.conf is hardcoded
     depends_on:
       gpg-webservice-rest:
         condition: service_healthy
