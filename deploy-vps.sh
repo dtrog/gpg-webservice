@@ -42,6 +42,45 @@ echo "🔧 Creating data directory for persistence..."
 mkdir -p data/gnupg
 chmod 700 data/gnupg
 
+echo "📝 Checking for .env file..."
+if [ ! -f .env ]; then
+  echo "⚠️  Creating .env file with default values..."
+  cat > .env <<'ENVEOF'
+# Flask REST API
+FLASK_ENV=production
+ENVIRONMENT=production
+LOG_LEVEL=INFO
+SECRET_KEY=CHANGE_ME_$(openssl rand -hex 32)
+SERVICE_KEY_PASSPHRASE=CHANGE_ME_$(openssl rand -base64 32)
+ADMIN_USERNAMES=administrator
+ADMIN_GPG_KEYS={}
+
+# Database
+DATABASE=/app/rest/gpg_users.db
+
+# Rate limiting
+RATE_LIMIT_AUTH_REQUESTS=5
+RATE_LIMIT_AUTH_WINDOW=60
+RATE_LIMIT_API_REQUESTS=30
+RATE_LIMIT_API_WINDOW=60
+
+# File uploads
+MAX_FILE_SIZE_MB=10
+MAX_SIGNATURE_SIZE_MB=1
+MAX_CONTENT_LENGTH=16777216
+
+# GPG settings
+GPG_KEY_LENGTH=3072
+GPG_KEY_TYPE=RSA
+ENVEOF
+  echo "⚠️  WARNING: Please edit .env and set proper SECRET_KEY, SERVICE_KEY_PASSPHRASE, and ADMIN_GPG_KEYS"
+  echo "⚠️  Then run: docker compose -f docker-compose.vps.yml restart"
+fi
+
+echo "🐳 Stopping old containers..."
+docker compose down 2>/dev/null || true
+docker compose -f docker-compose.vps.yml down 2>/dev/null || true
+
 echo "🐳 Building and starting unified service..."
 docker compose -f docker-compose.vps.yml down
 docker compose -f docker-compose.vps.yml up -d --build
