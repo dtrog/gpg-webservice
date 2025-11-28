@@ -389,7 +389,6 @@ async function main() {
   } else {
     // Fallback to plain HTTP
     console.log('Starting HTTP server (TLS not configured)');
-    }
     app.listen(appConfig.port, appConfig.host, () => {
       console.log(`\nGPG Webservice MCP Server listening on http://${appConfig.host}:${appConfig.port}`);
       console.log(`MCP endpoint: http://${appConfig.host}:${appConfig.port}/mcp`);
