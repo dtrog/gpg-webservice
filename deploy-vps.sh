@@ -44,18 +44,18 @@ bash setup-vps-env.sh
 echo "🐳 Stopping old containers..."
 docker compose down 2>/dev/null || true
 
-echo "🐳 Building and starting services (Caddy handles routing)..."
-docker compose up -d --build
+echo "🐳 Building and starting services with VPS config (no TLS, Caddy handles it)..."
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
 
 echo "⏳ Waiting for services to be healthy..."
 sleep 10
 
 echo "📊 Service status:"
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.vps.yml ps
 
 echo ""
 echo "📋 Recent logs:"
-docker compose logs --tail 20
+docker compose -f docker-compose.yml -f docker-compose.vps.yml logs --tail 20
 
 echo ""
 echo "✅ Deployment complete!"
