@@ -2,10 +2,23 @@
 # VPS Deployment Script for GPG Webservice
 # =========================================
 # Deploys the unified service to VPS via SSH
+#
+# Usage:
+#   VPS_HOST=user@your-server.com ./deploy-vps.sh
 
 set -e
 
-VPS_HOST="${VPS_HOST:-ubuntu@vps-b5527a39.vps.ovh.net}"
+if [ -z "$VPS_HOST" ]; then
+  echo "❌ Error: VPS_HOST environment variable not set"
+  echo ""
+  echo "Usage:"
+  echo "  VPS_HOST=user@your-server.com ./deploy-vps.sh"
+  echo ""
+  echo "Example:"
+  echo "  VPS_HOST=ubuntu@your-vps.example.com ./deploy-vps.sh"
+  exit 1
+fi
+
 DEPLOY_DIR="${DEPLOY_DIR:-gpg-webservice}"
 
 echo "🚀 Deploying to VPS: $VPS_HOST"
@@ -46,12 +59,12 @@ docker compose -f docker-compose.vps.yml logs --tail 20
 echo ""
 echo "✅ Deployment complete!"
 echo ""
-echo "🌐 Service accessible at:"
-echo "   Dashboard: http://vps-b5527a39.vps.ovh.net/"
-echo "   REST API:  http://vps-b5527a39.vps.ovh.net/api/"
-echo "   MCP:       http://vps-b5527a39.vps.ovh.net/mcp/"
+echo "🌐 Service should be accessible at:"
+echo "   Dashboard: http://\$VPS_HOST/"
+echo "   REST API:  http://\$VPS_HOST/api/"
+echo "   MCP:       http://\$VPS_HOST/mcp/"
 ENDSSH
 
 echo ""
 echo "🎉 Done! Check the service:"
-echo "   curl http://vps-b5527a39.vps.ovh.net/api/openai/function_definitions"
+echo "   curl http://YOUR_VPS_HOST/api/openai/function_definitions"
