@@ -1,13 +1,7 @@
 FROM nginx:alpine
 
-# Install envsubst for environment variable substitution
-RUN apk add --no-cache gettext
-
-# Copy nginx configuration template
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-
-# Copy config template
-COPY config.template.js /etc/config.template.js
+# Copy static nginx configuration (no runtime substitution needed)
+COPY nginx.conf.static /etc/nginx/conf.d/default.conf
 
 # Copy static files
 COPY index.html /usr/share/nginx/html/
@@ -21,8 +15,14 @@ COPY disclaimer.html /usr/share/nginx/html/
 COPY css/ /usr/share/nginx/html/css/
 COPY js/ /usr/share/nginx/html/js/
 
-# Expose port 80 (default) or PORT env var
+# Create a template for config.js with API_URL placeholder
+RUN echo 'window.CONFIG = { API_URL: "${API_URL}" };' > /etc/config.template.js
+
+# Set default environment variable
+ENV API_URL=http://localhost:5555
+
+# Run envsubst for config.js only and start nginx
+CMD ["/bin/sh", "-c", "envsubst '${API_URL}' < /etc/config.template.js > /usr/share/nginx/html/js/config.js && exec nginx -g 'daemon off;'"]
+
 EXPOSE 80
 
-# Start nginx with envsubst for PORT and API_URL variables
-CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && envsubst '${API_URL}' < /etc/config.template.js > /usr/share/nginx/html/js/config.js && nginx -g 'daemon off;'"]
