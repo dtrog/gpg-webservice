@@ -18,8 +18,7 @@ services:
       context: .
       dockerfile: Dockerfile.unified
     ports:
-      - "80:10000"
-      - "443:10000"
+      - "8080:10000"
     environment:
       # Port that nginx listens on (external)
       - PORT=10000
