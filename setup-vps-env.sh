@@ -39,10 +39,11 @@ fi
 
 # gpg-webservice-rest/.env
 if [ ! -f gpg-webservice-rest/.env ]; then
-  echo "Creating gpg-webservice-rest/.env..."
+  echo "Creating gpg-webservice-rest/.env (inherits from root .env via docker-compose)..."
   mkdir -p gpg-webservice-rest
   cat > gpg-webservice-rest/.env <<'EOF'
 # Flask REST API Configuration
+# Note: SECRET_KEY, SERVICE_KEY_PASSPHRASE, ADMIN_* are inherited from root .env via docker-compose.yml
 
 # Server
 HOST=0.0.0.0
@@ -53,16 +54,8 @@ FLASK_ENV=production
 ENVIRONMENT=production
 LOG_LEVEL=INFO
 
-# Security
-SECRET_KEY=${SECRET_KEY}
-SERVICE_KEY_PASSPHRASE=${SERVICE_KEY_PASSPHRASE}
-
 # Database
 DATABASE=/app/gpg_users.db
-
-# Admin
-ADMIN_USERNAMES=administrator
-ADMIN_GPG_KEYS={}
 
 # Rate limiting
 RATE_LIMIT_AUTH_REQUESTS=5
@@ -100,7 +93,9 @@ fi
 
 echo "✅ Environment files created"
 echo ""
-echo "⚠️  IMPORTANT: Edit .env and gpg-webservice-rest/.env to set:"
+echo "⚠️  IMPORTANT: Edit root .env to set:"
 echo "   - SECRET_KEY (generate with: openssl rand -hex 32)"
 echo "   - SERVICE_KEY_PASSPHRASE (generate with: openssl rand -base64 32)"
 echo "   - ADMIN_GPG_KEYS (your GPG public key in JSON format)"
+echo ""
+echo "These values are automatically passed to services via docker-compose.yml"

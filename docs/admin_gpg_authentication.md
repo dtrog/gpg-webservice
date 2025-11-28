@@ -46,18 +46,23 @@ cat admin-pubkey.asc | jq -Rs '{administrator: .}' | jq -c
 # Replace actual newlines with \\n in your editor
 ```
 
-Add to `.env`:
+Add to `gpg-webservice-rest/.env`:
 
 ```bash
 ADMIN_GPG_KEYS='{"administrator":"-----BEGIN PGP PUBLIC KEY BLOCK-----\\nVersion: GnuPG v2\\n\\nmQENBF...\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}'
 ```
 
-**Important**: The value must be a single-line JSON string with `\\n` (double backslash) for newlines when stored in `.env` files.
+**Important**: 
+- Add this to the **root `.env` file** (not `gpg-webservice-rest/.env`)
+- The root `.env` is the single source of truth - `docker-compose.yml` passes these values to all services
+- The value must be a single-line JSON string with `\\n` (double backslash) for newlines
+- Ensure the entire JSON value is wrapped in single quotes
 
 ### 3. Restart Services
 
 ```bash
-docker compose restart gpg-webservice-rest
+cd gpg-webservice
+docker compose -f docker-compose.yml -f docker-compose.vps.yml restart gpg-webservice-rest
 ```
 
 ## Usage
@@ -206,11 +211,11 @@ gpg --armor --export admin@example.com > my-key.asc
 # 2. Convert to JSON (one line, escape newlines)
 PUBLIC_KEY=$(cat my-key.asc | jq -Rs '.')
 
-# 3. Add to .env
-echo "ADMIN_GPG_KEYS='{\"administrator\":$PUBLIC_KEY}'" >> .env
+# 3. Add to gpg-webservice-rest/.env
+echo "ADMIN_GPG_KEYS='{\"administrator\":$PUBLIC_KEY}'" >> gpg-webservice-rest/.env
 
 # 4. Restart service
-docker compose restart gpg-webservice-rest
+docker compose -f docker-compose.yml -f docker-compose.vps.yml restart gpg-webservice-rest
 
 # 5. Login interactively
 python scripts/admin_gpg_auth.py login administrator
