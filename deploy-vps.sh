@@ -45,7 +45,7 @@ echo "🐳 Stopping old containers..."
 docker compose down 2>/dev/null || true
 
 echo "🐳 Building and starting services with VPS config (no TLS, Caddy handles it)..."
-docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build --force-recreate
 
 echo "⏳ Waiting for services to be healthy..."
 sleep 10

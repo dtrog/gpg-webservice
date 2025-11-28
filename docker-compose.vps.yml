@@ -9,8 +9,8 @@ services:
       # Remove TLS - Caddy handles HTTPS
       - TLS_CERT=
       - TLS_KEY=
+    # Override volumes completely to exclude TLS cert mounts
     volumes:
-      # Remove TLS cert mounts, keep database and GPG temp
       - ./gpg-webservice-rest/gpg_users.db:/app/gpg_users.db
       - gpg-temp:/tmp/gnupg
     healthcheck:

@@ -52,6 +52,8 @@ Add to `.env`:
 ADMIN_GPG_KEYS='{"administrator":"-----BEGIN PGP PUBLIC KEY BLOCK-----\\nVersion: GnuPG v2\\n\\nmQENBF...\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}'
 ```
 
+**Important**: The value must be a single-line JSON string with `\\n` (double backslash) for newlines when stored in `.env` files.
+
 ### 3. Restart Services
 
 ```bash
@@ -63,7 +65,7 @@ docker compose restart gpg-webservice-rest
 ### Interactive Login (Recommended)
 
 ```bash
-python scripts/admin_gpg_auth.py login administrator
+python3 scripts/admin_gpg_auth.py login administrator
 ```
 
 This will:
