@@ -1,7 +1,7 @@
 #!/bin/bash
 # VPS Deployment Script for GPG Webservice
 # =========================================
-# Deploys the unified service to VPS via SSH
+# Deploys services to VPS via SSH (Caddy handles routing)
 #
 # Usage:
 #   VPS_HOST=user@your-server.com ./deploy-vps.sh
@@ -38,72 +38,47 @@ cd gpg-webservice
 echo "📥 Pulling latest code..."
 git pull
 
-echo "🔧 Creating data directory for persistence..."
-mkdir -p data/gnupg
-chmod 700 data/gnupg
-
-echo "📝 Checking for .env file..."
-if [ ! -f .env ]; then
-  echo "⚠️  Creating .env file with default values..."
-  cat > .env <<'ENVEOF'
-# Flask REST API
-FLASK_ENV=production
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-SECRET_KEY=CHANGE_ME_$(openssl rand -hex 32)
-SERVICE_KEY_PASSPHRASE=CHANGE_ME_$(openssl rand -base64 32)
-ADMIN_USERNAMES=administrator
-ADMIN_GPG_KEYS={}
-
-# Database
-DATABASE=/app/rest/gpg_users.db
-
-# Rate limiting
-RATE_LIMIT_AUTH_REQUESTS=5
-RATE_LIMIT_AUTH_WINDOW=60
-RATE_LIMIT_API_REQUESTS=30
-RATE_LIMIT_API_WINDOW=60
-
-# File uploads
-MAX_FILE_SIZE_MB=10
-MAX_SIGNATURE_SIZE_MB=1
-MAX_CONTENT_LENGTH=16777216
-
-# GPG settings
-GPG_KEY_LENGTH=3072
-GPG_KEY_TYPE=RSA
-ENVEOF
-  echo "⚠️  WARNING: Please edit .env and set proper SECRET_KEY, SERVICE_KEY_PASSPHRASE, and ADMIN_GPG_KEYS"
-  echo "⚠️  Then run: docker compose -f docker-compose.vps.yml restart"
-fi
+echo "📝 Setting up environment files..."
+bash setup-vps-env.sh
 
 echo "🐳 Stopping old containers..."
 docker compose down 2>/dev/null || true
-docker compose -f docker-compose.vps.yml down 2>/dev/null || true
 
-echo "🐳 Building and starting unified service..."
-docker compose -f docker-compose.vps.yml down
-docker compose -f docker-compose.vps.yml up -d --build
+echo "🐳 Building and starting services (Caddy handles routing)..."
+docker compose up -d --build
 
-echo "⏳ Waiting for service to be healthy..."
-sleep 5
+echo "⏳ Waiting for services to be healthy..."
+sleep 10
 
 echo "📊 Service status:"
-docker compose -f docker-compose.vps.yml ps
+docker compose ps
 
 echo ""
 echo "📋 Recent logs:"
-docker compose -f docker-compose.vps.yml logs --tail 20
+docker compose logs --tail 20
 
 echo ""
 echo "✅ Deployment complete!"
 echo ""
-echo "🌐 Service should be accessible at:"
-echo "   Dashboard: http://\$VPS_HOST/"
-echo "   REST API:  http://\$VPS_HOST/api/"
-echo "   MCP:       http://\$VPS_HOST/mcp/"
+
+# Check if Caddy is running
+if command -v caddy >/dev/null 2>&1 && systemctl is-active --quiet caddy; then
+  echo "🌐 Caddy detected - services accessible via reverse proxy:"
+  echo "   Dashboard: https://\$(hostname)/"
+  echo "   REST API:  https://\$(hostname)/api/"
+  echo "   MCP:       https://\$(hostname)/mcp/"
+  echo ""
+  echo "   See docs/CADDY_SETUP.md for configuration"
+else
+  echo "🌐 Direct access (no Caddy):"
+  echo "   Dashboard: http://\$(hostname):8080/"
+  echo "   REST API:  http://\$(hostname):5555/"
+  echo "   MCP:       http://\$(hostname):3000/"
+  echo ""
+  echo "   Optional: Set up Caddy for HTTPS and clean URLs"
+  echo "   See docs/CADDY_SETUP.md"
+fi
 ENDSSH
 
 echo ""
-echo "🎉 Done! Check the service:"
-echo "   curl http://YOUR_VPS_HOST/api/openai/function_definitions"
+echo "🎉 Deployment complete!"
