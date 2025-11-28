@@ -3,14 +3,14 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files
-COPY gpg-webservice-mcp/package*.json ./
-COPY gpg-webservice-mcp/tsconfig.json ./
+COPY package*.json ./
+COPY tsconfig.json ./
 
 # Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
 # Copy source code
-COPY gpg-webservice-mcp/src ./src
+COPY src ./src
 
 # Build TypeScript
 RUN npm run build

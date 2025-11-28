@@ -4,22 +4,22 @@ FROM nginx:alpine
 RUN apk add --no-cache gettext
 
 # Copy nginx configuration template
-COPY gpg-webservice-dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Copy config template
-COPY gpg-webservice-dashboard/config.template.js /etc/config.template.js
+COPY config.template.js /etc/config.template.js
 
 # Copy static files
-COPY gpg-webservice-dashboard/index.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/register.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/login.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/profile.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/debug.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/admin.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/admin-login.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/disclaimer.html /usr/share/nginx/html/
-COPY gpg-webservice-dashboard/css/ /usr/share/nginx/html/css/
-COPY gpg-webservice-dashboard/js/ /usr/share/nginx/html/js/
+COPY index.html /usr/share/nginx/html/
+COPY register.html /usr/share/nginx/html/
+COPY login.html /usr/share/nginx/html/
+COPY profile.html /usr/share/nginx/html/
+COPY debug.html /usr/share/nginx/html/
+COPY admin.html /usr/share/nginx/html/
+COPY admin-login.html /usr/share/nginx/html/
+COPY disclaimer.html /usr/share/nginx/html/
+COPY css/ /usr/share/nginx/html/css/
+COPY js/ /usr/share/nginx/html/js/
 
 # Expose port 80 (default) or PORT env var
 EXPOSE 80

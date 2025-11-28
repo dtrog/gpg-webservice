@@ -9,13 +9,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better layer caching
-COPY gpg-webservice-rest/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY gpg-webservice-rest/ .
+COPY . .
 
 # Create a non-root user for running the app
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
