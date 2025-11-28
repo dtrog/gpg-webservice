@@ -45,21 +45,22 @@ Convert your public key to single-line JSON format:
 # Method 2: Using jq manually
 cat admin-pubkey.asc | jq -Rs '{administrator: .}' | jq -c
 
-# Method 3: Manual (escape newlines as \\n in your editor)
-# Replace actual newlines with \\n
+# Method 3: Manual (escape newlines as \n in your editor)
+# Replace actual newlines with \n (single backslash-n)
 ```
 
 Copy the output and add it to **root `.env`** file on the VPS:
 
 ```bash
-ADMIN_GPG_KEYS='{"administrator":"-----BEGIN PGP PUBLIC KEY BLOCK-----\\nVersion: GnuPG v2\\n\\nmQENBF...\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}'
+ADMIN_GPG_KEYS='{"administrator":"-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: GnuPG v2\n\nmQENBF...\n-----END PGP PUBLIC KEY BLOCK-----\n"}'
 ```
 
 **Important**: 
 - Add this to the **root `.env` file** (not `gpg-webservice-rest/.env`)
 - The root `.env` is the single source of truth - `docker-compose.yml` passes these values to all services
-- The value must be a single-line JSON string with `\\n` (double backslash) for newlines
+- The value must be a single-line JSON string with `\n` (single backslash-n) for newlines
 - Ensure the entire JSON value is wrapped in single quotes
+- The helper script `export_gpg_for_env.sh` outputs the correct format
 
 ### 3. Restart Services
 
