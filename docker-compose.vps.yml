@@ -34,7 +34,9 @@ services:
     environment:
       # Point to Caddy-proxied API (external HTTPS endpoint)
       - API_URL=https://vps-b5527a39.vps.ovh.net/api
-    volumes: []
+    volumes:
+      # Override with static HTTP config (no TLS redirect)
+      - ./gpg-webservice-dashboard/nginx.conf.static:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       # Already checking HTTP - no change needed
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
