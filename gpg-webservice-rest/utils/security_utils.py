@@ -131,9 +131,9 @@ def validate_username(username: str) -> Tuple[bool, Optional[str]]:
     if len(username) > 50:
         return False, "Username must be no more than 50 characters long"
     
-    # Allow alphanumeric characters, underscores, and hyphens
-    if not re.match(r'^[a-zA-Z0-9_-]+$', username):
-        return False, "Username can only contain letters, numbers, underscores, and hyphens"
+    # Allow alphanumeric characters, underscores, hyphens, and dots
+    if not re.match(r'^[a-zA-Z0-9_.-]+$', username):
+        return False, "Username can only contain letters, numbers, underscores, hyphens, and dots"
     
     # Prevent reserved usernames (administrator allowed for admin access)
     reserved = {'admin', 'root', 'system', 'test', 'null', 'undefined'}
