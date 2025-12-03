@@ -282,6 +282,11 @@ def encrypt_file(input_path: str, public_key: str, output_path: str):
         if not fpr:
             raise GPGOperationError('encryption', 'Could not extract key fingerprint')
 
+        # SECURITY: Validate fingerprint is hexadecimal only to prevent command injection
+        import re
+        if not re.match(r'^[A-F0-9]+$', fpr, re.IGNORECASE):
+            raise GPGOperationError('encryption', 'Invalid key fingerprint format')
+
         # Encrypt file using builder
         (GPGCommandBuilder(gnupg_home)
          .with_yes()

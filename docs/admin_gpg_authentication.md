@@ -74,7 +74,17 @@ docker compose -f docker-compose.yml -f docker-compose.vps.yml restart gpg-webse
 ### Interactive Login (Recommended)
 
 ```bash
-python3 scripts/admin_gpg_auth.py login administrator
+# If using conda:
+conda run -n base python scripts/admin_gpg_auth.py login administrator [gpg-key-id]
+
+# Or with system Python (if requests is installed):
+python3 scripts/admin_gpg_auth.py login administrator [gpg-key-id]
+```
+
+**Specify GPG Key (Optional):**
+If you have multiple GPG keys, specify which one to use by adding the key ID or email:
+```bash
+conda run -n base python scripts/admin_gpg_auth.py login administrator erupt.salute-0f@icloud.com
 ```
 
 This will:

@@ -356,6 +356,9 @@ def verify_session_key(contract_hash: str, master_salt: str,
     This function checks if the provided key matches either the current
     session window or the previous window (if within grace period).
 
+    SECURITY: Uses constant-time comparison to prevent timing attacks.
+    Always derives both current and previous keys to avoid timing side-channels.
+
     Args:
         contract_hash (str): The user's stored contract hash
         master_salt (str): The user's stored master salt
@@ -366,17 +369,26 @@ def verify_session_key(contract_hash: str, master_salt: str,
     """
     master_secret = derive_master_secret(contract_hash, master_salt)
     current_window = get_session_window()
+    previous_window = current_window - 1
 
-    # Check current window
-    expected_key = derive_session_key(master_secret, current_window)
-    if hmac.compare_digest(provided_key, expected_key):
+    # SECURITY: Always derive both keys (constant-time behavior)
+    # This prevents timing attacks that could reveal grace period boundaries
+    expected_current = derive_session_key(master_secret, current_window)
+    expected_previous = derive_session_key(master_secret, previous_window)
+
+    # Check current window (constant-time comparison)
+    valid_current = hmac.compare_digest(provided_key, expected_current)
+
+    # Check previous window (constant-time comparison)
+    valid_previous = hmac.compare_digest(provided_key, expected_previous)
+
+    # Only accept previous window if within grace period
+    within_grace = is_within_grace_period()
+
+    # Return results (checked in order of preference)
+    if valid_current:
         return (True, current_window, "Valid for current session window")
-
-    # Check previous window if within grace period
-    if is_within_grace_period():
-        previous_window = current_window - 1
-        expected_key_prev = derive_session_key(master_secret, previous_window)
-        if hmac.compare_digest(provided_key, expected_key_prev):
-            return (True, previous_window, "Valid via grace period (previous window)")
-
-    return (False, None, "Invalid or expired session key")
+    elif valid_previous and within_grace:
+        return (True, previous_window, "Valid via grace period (previous window)")
+    else:
+        return (False, None, "Invalid or expired session key")

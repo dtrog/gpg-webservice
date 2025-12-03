@@ -32,7 +32,7 @@ ADMIN_USERNAMES=administrator
 ADMIN_GPG_KEYS={}
 
 # Dashboard API URL (for Caddy reverse proxy)
-API_URL=https://vps-b5527a39.vps.ovh.net
+API_URL=https://$VPS_HOSTNAME
 EOF
   echo "⚠️  WARNING: Edit .env and set proper SECRET_KEY, SERVICE_KEY_PASSPHRASE, and ADMIN_GPG_KEYS"
 fi
@@ -47,7 +47,7 @@ if [ ! -f gpg-webservice-rest/.env ]; then
 
 # Server
 HOST=0.0.0.0
-PORT=5555
+PORT=$FLASK_PORT
 
 # Environment
 FLASK_ENV=production
@@ -83,10 +83,10 @@ if [ ! -f gpg-webservice-mcp/.env ]; then
 # GPG Webservice MCP Adapter Configuration
 
 # Base URL of the Flask GPG webservice (internal docker network)
-GPG_API_BASE=http://gpg-webservice-rest:5555
+GPG_API_BASE=http://$VPS_HOSTNAME:$FLASK_PORT
 
 # HTTP Transport Configuration
-MCP_PORT=3000
+MCP_PORT=$MCP_PORT
 MCP_HOST=0.0.0.0
 EOF
 fi

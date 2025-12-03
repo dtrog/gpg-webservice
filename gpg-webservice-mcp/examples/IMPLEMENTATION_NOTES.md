@@ -52,43 +52,22 @@ The official `examples/hosted_mcp` directory shows examples using `HostedMCPTool
 Our GPG Webservice runs locally (or in Docker), so we use `MCPServerStreamableHttp`:
 
 ### Streamable HTTP (Our Implementation)
+
 - **Location**: MCP server runs locally or in private network
 - **Flow**: OpenAI → Your Python script → MCP server → Flask API
 - **Control**: Full control over tool execution
 - **Use case**: Local development, private services
 
 ### Hosted MCP (Not Used)
+
 - **Location**: MCP server is publicly accessible via HTTPS
 - **Flow**: OpenAI → Public MCP server (no your code involved)
 - **Control**: OpenAI handles all tool calls
 - **Use case**: Public services like gitmcp.io
 
-## Key Improvements from Original Example
-
-### Before
-```python
-# Old pattern - outdated
-result = await agent.run("prompt")
-print(result.output)
-```
-
-### After
-```python
-# Current pattern - matches OpenAI's latest examples
-result = await Runner.run(starting_agent=agent, input="prompt")
-print(result.final_output)
-```
-
-### Added Features
-1. **Tracing**: Generate trace IDs for monitoring in OpenAI Platform
-2. **Better Error Handling**: Clear error messages and setup validation
-3. **Comprehensive Examples**: 4 complete workflows (register, sign, verify, encrypt/decrypt)
-4. **Documentation**: Detailed README with troubleshooting
-5. **Context Management**: Proper agent instruction design for API key handling
-
 ## Architecture
 
-```
+```plaintext
 ┌─────────────────┐
 │  User's Python  │
 │  Script with    │
@@ -128,23 +107,28 @@ print(result.final_output)
 ## Testing the Example
 
 ### Prerequisites
+
 1. Docker services running:
+
    ```bash
    docker-compose up -d
    ```
 
 2. MCP server healthy:
+
    ```bash
    curl http://localhost:3000/health
    # {"status":"healthy",...,"tools_loaded":7}
    ```
 
 3. OpenAI API key set:
+
    ```bash
    export OPENAI_API_KEY=sk-...
    ```
 
 ### Run
+
 ```bash
 cd gpg-webservice-mcp/examples
 pip install openai-agents
@@ -152,6 +136,7 @@ python openai_agent_example.py
 ```
 
 ### Expected Results
+
 - Agent registers user `alice_demo`
 - Receives API key starting with `sk_`
 - Signs message successfully
@@ -165,6 +150,7 @@ View traces at:
 ## What's Next?
 
 ### Potential Enhancements
+
 1. **Streaming Example**: Demonstrate `Runner.run_streamed()` for real-time updates
 2. **Multi-User Example**: Show handling multiple users in one session
 3. **Error Recovery**: Demonstrate handling failed operations
@@ -172,6 +158,7 @@ View traces at:
 5. **Custom Authentication**: Show integration with existing auth systems
 
 ### Deployment Considerations
+
 1. **Production Setup**: Deploy MCP server with proper HTTPS
 2. **Rate Limiting**: Add rate limits to prevent API abuse
 3. **Monitoring**: Integrate with logging/monitoring systems

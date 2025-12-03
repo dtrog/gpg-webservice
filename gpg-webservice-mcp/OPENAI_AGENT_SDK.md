@@ -32,8 +32,8 @@ The OpenAI Agent SDK supports MCP (Model Context Protocol) servers through the `
 
 ```python
 import asyncio
-from openai_agents import Agent
-from openai_agents.mcp import MCPServerStreamableHttp
+from agents import Agent
+from agents.mcp import MCPServerStreamableHttp
 
 async def main():
     # Connect to the GPG MCP server

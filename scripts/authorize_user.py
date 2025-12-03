@@ -17,7 +17,6 @@ Example:
 
 import sys
 import subprocess
-import base64
 
 
 def sign_username(username: str, gpg_key_id: str = None) -> str:
@@ -87,7 +86,7 @@ def main():
     
     print("\n3. Example registration (JSON):")
     print(f"""
-curl -X POST https://vps-b5527a39.vps.ovh.net/register \\
+curl -X POST $VPS_HOST/register \\
   -H "Content-Type: application/json" \\
   -d '{{
     "username": "{username}",

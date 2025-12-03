@@ -129,7 +129,8 @@ class UserService:
                 # Check if user already exists
                 existing_user = session.query(User).filter_by(username=username).first()
                 if existing_user:
-                    return None, "Username already exists"
+                    # SECURITY: Use generic error to prevent username enumeration
+                    return None, "Registration failed. Please verify your credentials or contact administrator."
 
                 # Hash the provided password (contract_hash) with Argon2id
                 password_hash_val = hash_password(password)

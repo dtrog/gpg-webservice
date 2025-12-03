@@ -71,9 +71,9 @@ if command -v caddy >/dev/null 2>&1 && systemctl is-active --quiet caddy; then
   echo "   See docs/CADDY_SETUP.md for configuration"
 else
   echo "🌐 Direct access (no Caddy):"
-  echo "   Dashboard: http://\$(hostname):8080/"
-  echo "   REST API:  http://\$(hostname):5555/"
-  echo "   MCP:       http://\$(hostname):3000/"
+  echo "   Dashboard: http://\$(hostname):$DASHBOARD_PORT/"
+  echo "   REST API:  http://\$(hostname):$FLASK_PORT/"
+  echo "   MCP:       http://\$(hostname):$MCP_PORT/"
   echo ""
   echo "   Optional: Set up Caddy for HTTPS and clean URLs"
   echo "   See docs/CADDY_SETUP.md"

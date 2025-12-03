@@ -143,7 +143,7 @@ if __name__ == "__main__":
     if tls_cert and tls_key and os.path.exists(tls_cert) and os.path.exists(tls_key):
         # Run Flask development server with SSL context for local testing.
         logging.info("Starting Flask with TLS (local development)")
-        app.run(host=config_class.HOST, port=config_class.PORT, 
+        app.run(host=config_class.HOST, port=config_class.PORT,
                 ssl_context=(tls_cert, tls_key))
     else:
         logging.info("Starting Flask without TLS")

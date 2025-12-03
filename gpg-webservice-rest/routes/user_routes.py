@@ -8,6 +8,7 @@ DETERMINISTIC SESSION KEYS:
 - AI agents can regenerate keys by re-logging in
 """
 
+import os
 from flask import Blueprint, request, jsonify, make_response
 from utils.security_utils import (
     rate_limit_auth,
@@ -52,14 +53,18 @@ def register():
     username = data.get('username')
     password = data.get('password')
     email = data.get('email')
-    admin_signature = data.get('admin_signature')  # Required for authorization
+    admin_signature = data.get('admin_signature')  # Option 1: Admin signature
+    registration_token = data.get('registration_token')  # Option 2: Registration token
 
     # Validate input
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
 
-    if not admin_signature:
-        return jsonify({'error': 'Admin signature required for registration'}), 400
+    # Require EITHER admin signature OR registration token
+    if not admin_signature and not registration_token:
+        return jsonify({
+            'error': 'Authorization required: provide either admin_signature or registration_token'
+        }), 400
 
     valid, error = validate_username(username)
     if not valid:
@@ -74,36 +79,55 @@ def register():
         if not valid:
             return jsonify({'error': error}), 400
 
-    admin_keys = get_admin_gpg_keys()
-    if not admin_keys:
-        return jsonify({'error': 'Admin authorization not configured'}), 500
-
-    # Try each admin's public key
-    signature_valid = False
+    # Authorization check
+    authorized = False
     authorizing_admin = None
+    auth_method = None
 
-    for admin_username, public_key in admin_keys.items():
-        is_valid = verify_gpg_signature(username,
-                                        admin_signature,
-                                        public_key)
-        if is_valid:
-            signature_valid = True
-            authorizing_admin = admin_username
-            break
+    # Option 1: Try registration token first (for AI agent self-registration)
+    if registration_token:
+        expected_token = os.environ.get('REGISTRATION_TOKEN', '')
+        if expected_token and registration_token == expected_token:
+            authorized = True
+            authorizing_admin = 'system_token'
+            auth_method = 'registration_token'
 
-    if not signature_valid:
+    # Option 2: Try admin GPG signature (for human-authorized registration)
+    if not authorized and admin_signature:
+        admin_keys = get_admin_gpg_keys()
+        if not admin_keys:
+            return jsonify({'error': 'Admin authorization not configured'}), 500
+
+        for admin_username, public_key in admin_keys.items():
+            # SECURITY: Explicitly unpack tuple and validate boolean result
+            is_valid, error_msg = verify_gpg_signature(username,
+                                                        admin_signature,
+                                                        public_key)
+            if not isinstance(is_valid, bool):
+                audit_logger.log_event(
+                    AuditEventType.REGISTRATION,
+                    status='failure',
+                    username=username,
+                    message=f'Internal error: verify_gpg_signature returned invalid type: {type(is_valid)}'
+                )
+                continue
+
+            if is_valid:
+                authorized = True
+                authorizing_admin = admin_username
+                auth_method = 'admin_signature'
+                break
+
+    if not authorized:
         audit_logger.log_event(
             AuditEventType.REGISTRATION,
             status='failure',
             username=username,
-            message=(
-                f'Registration denied for {username}: Invalid admin signature'
-            )
+            message=f'Registration denied for {username}: Invalid authorization'
         )
         return jsonify({
-            'error': 'Invalid admin signature',
-            'hint': 'Admin must sign username with: echo "username" | '
-                    'gpg --armor --detach-sign'
+            'error': 'Invalid authorization',
+            'hint': 'Provide valid admin_signature or registration_token'
         }), 403
 
     public_key_data = data.get('public_key')  # Optional
@@ -134,7 +158,7 @@ def register():
         status='success',
         user_id=registration_result.user.id,
         username=username,
-        message=f'Registration authorized by admin: {authorizing_admin}'
+        message=f'Registration authorized by: {authorizing_admin} (method: {auth_method})'
     )
 
     # Safely determine the public key to return
@@ -225,14 +249,17 @@ def register_form():
     username = request.form.get('username')
     password = request.form.get('password')
     email = request.form.get('email')
-    admin_signature = request.form.get('admin_signature')  # Required
+    admin_signature = request.form.get('admin_signature')  # Option 1
+    registration_token = request.form.get('registration_token')  # Option 2
 
     # Validate input
     if not username or not password:
         return jsonify({'error': 'Username and password are required'}), 400
 
-    if not admin_signature:
-        return jsonify({'error': 'Admin signature required'}), 400
+    if not admin_signature and not registration_token:
+        return jsonify({
+            'error': 'Authorization required: provide admin_signature or registration_token'
+        }), 400
 
     valid, error = validate_username(username)
     if not valid:
@@ -247,31 +274,53 @@ def register_form():
         if not valid:
             return jsonify({'error': error}), 400
 
-    # Verify admin signature
-    admin_keys = get_admin_gpg_keys()
-    if not admin_keys:
-        return jsonify({'error': 'Admin authorization not configured'}), 500
-
-    signature_valid = False
+    # Authorization check
+    authorized = False
     authorizing_admin = None
+    auth_method = None
 
-    for admin_username, public_key in admin_keys.items():
-        is_valid, _ = verify_gpg_signature(
-            username, admin_signature, public_key
-        )
-        if is_valid:
-            signature_valid = True
-            authorizing_admin = admin_username
-            break
+    # Try registration token first
+    if registration_token:
+        expected_token = os.environ.get('REGISTRATION_TOKEN', '')
+        if expected_token and registration_token == expected_token:
+            authorized = True
+            authorizing_admin = 'system_token'
+            auth_method = 'registration_token'
 
-    if not signature_valid:
+    # Try admin signature
+    if not authorized and admin_signature:
+        admin_keys = get_admin_gpg_keys()
+        if not admin_keys:
+            return jsonify({'error': 'Admin authorization not configured'}), 500
+
+        for admin_username, public_key in admin_keys.items():
+            # SECURITY: Explicitly unpack tuple and validate boolean result
+            is_valid, error_msg = verify_gpg_signature(
+                username, admin_signature, public_key
+            )
+            if not isinstance(is_valid, bool):
+                audit_logger.log_event(
+                    AuditEventType.REGISTRATION,
+                    status='failure',
+                    username=username,
+                    message=f'Internal error: verify_gpg_signature returned invalid type: {type(is_valid)}'
+                )
+                continue
+
+            if is_valid:
+                authorized = True
+                authorizing_admin = admin_username
+                auth_method = 'admin_signature'
+                break
+
+    if not authorized:
         audit_logger.log_event(
             AuditEventType.REGISTRATION,
             status='failure',
             username=username,
-            message='Registration denied: Invalid admin signature'
+            message='Registration denied: Invalid authorization'
         )
-        return jsonify({'error': 'Invalid admin signature'}), 403
+        return jsonify({'error': 'Invalid authorization'}), 403
 
     # Handle optional PGP key uploads
     public_key_data = None
@@ -321,7 +370,7 @@ def register_form():
         status='success',
         user_id=registration_result.user.id,
         username=username,
-        message=f'Registration authorized by: {authorizing_admin}'
+        message=f'Registration authorized by: {authorizing_admin} (method: {auth_method})'
     )
 
     # Safely determine the public key to return

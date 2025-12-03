@@ -48,7 +48,7 @@ The MCP server dynamically exposes these tools from the Flask webservice:
 
    Edit `.env` and set:
    ```env
-   GPG_API_BASE=http://localhost:5000
+   GPG_API_BASE=http://localhost:5555
    # Optional: Set a default API key
    # GPG_API_KEY=your-api-key-here
    ```
@@ -64,7 +64,7 @@ The MCP server dynamically exposes these tools from the Flask webservice:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `GPG_API_BASE` | Yes | `http://localhost:5000` | Base URL of the Flask GPG webservice |
+| `GPG_API_BASE` | Yes | `http://localhost:5555` | Base URL of the Flask GPG webservice |
 | `GPG_API_KEY` | No | - | Default API key for authenticated operations |
 | `MCP_PORT` | No (HTTP only) | `3000` | Port for HTTP transport server |
 | `MCP_HOST` | No (HTTP only) | `0.0.0.0` | Host address for HTTP transport (use `0.0.0.0` for external access) |
@@ -161,7 +161,7 @@ services:
       context: ./gpg-webservice-mcp
       dockerfile: Dockerfile
     environment:
-      - GPG_API_BASE=http://gpg-webservice:5000
+      - GPG_API_BASE=http://gpg-webservice:5555
       - GPG_API_KEY=${GPG_API_KEY}
     depends_on:
       - gpg-webservice
@@ -210,7 +210,7 @@ For detailed integration with OpenAI's Agent SDK (Python), see [OPENAI_AGENT_SDK
 **Quick Start:**
 ```bash
 # 1. Install Python SDK
-pip install openai-agents-sdk
+pip install openai-agents
 
 # 2. Start MCP HTTP server
 npm run start:http
@@ -251,7 +251,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
       "command": "node",
       "args": ["/absolute/path/to/gpg-webservice-mcp/dist/index.js"],
       "env": {
-        "GPG_API_BASE": "http://localhost:5000",
+        "GPG_API_BASE": "http://localhost:5555",
         "GPG_API_KEY": "your-api-key-here"
       }
     }

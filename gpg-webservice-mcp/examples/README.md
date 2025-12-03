@@ -5,16 +5,19 @@ This directory contains **optimized** example scripts demonstrating how to use t
 ## 🎯 Quick Start
 
 1. **Simple Test** (verifies connectivity):
+
    ```bash
    python simple_test.py
    ```
 
 2. **Basic Workflow** (login → sign → verify):
+
    ```bash
    python openai_agent_example.py
    ```
 
 3. **Advanced Workflows** (multi-user, error recovery):
+
    ```bash
    python advanced_workflow_example.py
    ```
@@ -24,21 +27,26 @@ This directory contains **optimized** example scripts demonstrating how to use t
 1. **Python 3.10 or higher**
 
 2. **OpenAI API Key**
+
    ```bash
    export OPENAI_API_KEY=your-openai-api-key-here
    ```
 
 3. **GPG Webservice Running (with Docker)**
+
    ```bash
    # In the root directory of the project
    docker-compose up -d
    ```
+
    This starts all three services:
+
    - REST API: `http://localhost:5555`
    - MCP Server: `http://localhost:3000/mcp`
    - Dashboard: `http://localhost:8080`
 
    Verify MCP is running:
+
    ```bash
    curl http://localhost:3000/health
    # Should return: {"status":"healthy",...,"tools_loaded":7}
@@ -64,6 +72,7 @@ pip install openai-agents-mcp
 ### Basic Example
 
 The basic example demonstrates:
+
 - Connecting to the MCP server
 - Registering a new GPG user
 - Signing a message
@@ -74,7 +83,8 @@ python openai_agent_example.py
 ```
 
 Expected output:
-```
+
+```plaintext
 🚀 Starting GPG Agent with MCP tools...
 ============================================================
 
@@ -114,11 +124,13 @@ API Key: gpg_abc123... (save this securely!)
 **Purpose**: Verify MCP server connectivity with minimal complexity
 
 **What it does**:
+
 - Connects to MCP server
 - Performs single login operation
 - Validates response
 
 **Use when**:
+
 - Testing MCP server setup
 - Debugging connection issues
 - Validating environment configuration
@@ -134,11 +146,13 @@ Expected: "Login successful. You can now perform GPG operations..."
 **Purpose**: Production-ready 3-step workflow with best practices
 
 **What it does**:
+
 1. Login or register user (with login-first pattern)
 2. Sign a message using stored API key
 3. Verify the signature
 
 **Optimizations**:
+
 - ✅ Explicit memory management instructions
 - ✅ Error recovery guidance
 - ✅ 20 turn limit (increased from 15)
@@ -146,6 +160,7 @@ Expected: "Login successful. You can now perform GPG operations..."
 - ✅ Clear step-by-step workflow
 
 **Use when**:
+
 - Building standard GPG workflows
 - Need reliable 3-5 step workflows
 - Template for new agent implementations
@@ -155,6 +170,7 @@ python openai_agent_example.py
 ```
 
 **Key Features**:
+
 - Login-first pattern (avoids database pollution)
 - Context retention across operations
 - Comprehensive error handling
@@ -165,17 +181,20 @@ python openai_agent_example.py
 **Purpose**: Maximum reliability through extreme explicitness
 
 **What it does**:
+
 - Same as standard workflow but with explicit state tracking
 - Forces agent to confirm storage of all credentials
 - Requires status updates after each step
 
 **Special Features**:
+
 - State storage format: `"STORED: NAME = value"`
 - Step completion confirmations
 - Success indicator analysis
 - Higher turn budget (20)
 
 **Use when**:
+
 - Production critical workflows
 - Debugging context loss issues
 - Need guaranteed state retention
@@ -195,7 +214,7 @@ python streamlined_example.py
    - Setup Alice and Bob
    - Alice encrypts message for Bob
    - Bob decrypts the message
-   
+
 2. **Signature Chain** (30 turns)
    - Multiple users sign same document
    - Creates audit trail
@@ -207,6 +226,7 @@ python streamlined_example.py
    - Shows resilience strategies
 
 **Use when**:
+
 - Learning complex workflow patterns
 - Building multi-user systems
 - Need error recovery examples
@@ -255,11 +275,13 @@ if __name__ == "__main__":
 ### "Connection refused" error
 
 Make sure the MCP HTTP server is running:
+
 ```bash
 curl http://localhost:3000/health
 ```
 
 Should return:
+
 ```json
 {
   "status": "healthy",
@@ -273,6 +295,7 @@ Should return:
 ### "OPENAI_API_KEY not set" error
 
 Set your OpenAI API key:
+
 ```bash
 export OPENAI_API_KEY=sk-...
 ```
@@ -280,13 +303,15 @@ export OPENAI_API_KEY=sk-...
 ### "Failed to fetch function definitions" error
 
 Ensure the Flask GPG webservice is running:
+
 ```bash
-curl http://localhost:5000/openai/function_definitions
+curl http://localhost:5555/openai/function_definitions
 ```
 
 ### Timeout errors
 
 Increase the timeout in the MCP server params:
+
 ```python
 params={
     "url": "http://localhost:3000/mcp",

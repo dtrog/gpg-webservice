@@ -21,7 +21,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     TESTING = os.environ.get('TESTING', 'false').lower() == 'true'
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
-    PORT = int(os.environ.get('PORT', 5555))
+    PORT = int(os.environ.get('PORT', os.environ.get('FLASK_PORT', 5555)))
     HOST = os.environ.get('HOST', '0.0.0.0')
 
     # Database
@@ -135,7 +135,7 @@ class Config:
             errors.append("API_KEY_LENGTH must be >= 16 for security")
 
         if errors:
-            raise ValueError(f"Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
+            raise ValueError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
         return True
 

@@ -386,21 +386,6 @@ echo "DATABASE_URL=postgresql://user:pass@host:5432/gpg_db" >> .env
 docker-compose up -d
 ```
 
-### Using Render.com
-
-The project includes `.render.yaml` configuration:
-
-```bash
-# 1. Push to GitHub/GitLab
-git push origin main
-
-# 2. Connect repository to Render
-# 3. Render will auto-deploy using .render.yaml
-
-# Configuration is in:
-# gpg-webservice-rest/.render.yaml
-```
-
 See [DEPLOYMENT.md](./gpg-webservice-rest/DEPLOYMENT.md) for detailed
 production setup.
 

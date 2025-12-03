@@ -136,9 +136,9 @@ check_port() {
 }
 
 PORTS_OK=true
-check_port 5555 || PORTS_OK=false
-check_port 3000 || PORTS_OK=false
-check_port 8080 || PORTS_OK=false
+check_port $FLASK_PORT || PORTS_OK=false
+check_port $MCP_PORT || PORTS_OK=false
+check_port $DASHBOARD_PORT || PORTS_OK=false
 
 if [ "$PORTS_OK" = false ]; then
     print_warning "Some ports are in use. You may need to stop conflicting services or change ports in .env"
@@ -284,7 +284,7 @@ print_info "Waiting for services to be ready (this may take 30-60 seconds)..."
 
 # Wait for REST API
 for i in {1..30}; do
-    if curl -sf http://localhost:5555/openai/function_definitions > /dev/null 2>&1; then
+    if curl -sf http://localhost:$FLASK_PORT/openai/function_definitions > /dev/null 2>&1; then
         print_success "REST API is healthy"
         break
     fi
@@ -298,7 +298,7 @@ done
 
 # Wait for MCP Server
 for i in {1..20}; do
-    if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+    if curl -sf http://localhost:$MCP_PORT/health > /dev/null 2>&1; then
         print_success "MCP Server is healthy"
         break
     fi
@@ -310,7 +310,7 @@ done
 
 # Wait for Dashboard
 for i in {1..10}; do
-    if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+    if curl -sf http://localhost:$DASHBOARD_PORT/health > /dev/null 2>&1; then
         print_success "Dashboard is healthy"
         break
     fi
@@ -401,19 +401,19 @@ print_header "✅ Setup Complete!"
 echo "Your GPG Webservice suite is now running!"
 echo ""
 echo "Access URLs:"
-echo "  🌐 REST API:    http://localhost:5555"
-echo "  🤖 MCP Server:  http://localhost:3000"
-echo "  📊 Dashboard:   http://localhost:8080"
+echo "  🌐 REST API:    http://localhost:$FLASK_PORT"
+echo "  🤖 MCP Server:  http://localhost:$MCP_PORT"
+echo "  📊 Dashboard:   http://localhost:$DASHBOARD_PORT"
 echo ""
 echo "Quick Test:"
-echo "  curl http://localhost:5555/openai/function_definitions"
+echo "  curl http://localhost:$FLASK_PORT/openai/function_definitions"
 echo ""
 echo "Next Steps:"
-echo "  1. Open dashboard: http://localhost:8080"
+echo "  1. Open dashboard: http://localhost:$DASHBOARD_PORT/"
 if grep -q "^ADMIN_USERNAMES=" .env && [ -n "$(grep "^ADMIN_USERNAMES=" .env | cut -d '=' -f2-)" ]; then
     ADMIN_USER=$(grep "^ADMIN_USERNAMES=" .env | cut -d '=' -f2- | cut -d ',' -f1)
     echo "  2. Login with admin account: $ADMIN_USER"
-    echo "  3. Access admin panel: http://localhost:8080/admin.html"
+    echo "  3. Access admin panel: http://localhost:$DASHBOARD_PORT/admin.html"
 else
     echo "  2. Register a user"
     echo "  3. Try signing a file"

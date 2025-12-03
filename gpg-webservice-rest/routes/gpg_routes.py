@@ -22,6 +22,7 @@ from utils.security_utils import rate_limit_api, validate_file_upload, secure_te
 from services.auth_service import get_user_by_api_key, authenticate_request
 from utils.gpg_file_utils import sign_file, verify_signature_file, encrypt_file, decrypt_file
 from utils.audit_logger import audit_logger, AuditEventType
+from utils.error_handling import GPGOperationError
 
 # GPG-related routes
 gpg_bp = Blueprint('gpg', __name__)
@@ -121,8 +122,8 @@ def sign(user, raw_api_key):
                 file_size=os.path.getsize(input_path)
             )
 
-        except Exception as e:
-            # Log GPG operation failure
+        except GPGOperationError as e:
+            # Log GPG operation failure with full error details
             audit_logger.log_error(
                 'gpg',
                 message=f'GPG sign failed for user {user.username}',
@@ -130,7 +131,18 @@ def sign(user, raw_api_key):
                 username=user.username,
                 error=str(e)
             )
-            return jsonify({'error': f'Signing failed: {str(e)}'}), 500
+            # SECURITY: Return generic error to client (no sensitive details)
+            return jsonify({'error': 'Cryptographic signing operation failed. Please try again.'}), 500
+        except Exception as e:
+            # Catch-all for unexpected errors
+            audit_logger.log_error(
+                'gpg',
+                message=f'Unexpected error during signing for user {user.username}',
+                user_id=user.id,
+                username=user.username,
+                error=str(e)
+            )
+            return jsonify({'error': 'An unexpected error occurred. Please contact support.'}), 500
         return send_file(sig_path, as_attachment=True)
 
 # --- VERIFY ---
@@ -198,8 +210,13 @@ def verify(user, raw_api_key):
                     result = subprocess.run(verify_cmd, capture_output=True)
                     verified = result.returncode == 0
 
+        except GPGOperationError as e:
+            audit_logger.log_error('gpg', message='Verification failed', user_id=user.id, error=str(e))
+            # SECURITY: Generic error to client
+            return jsonify({'error': 'Signature verification failed. Please check the signature and public key.'}), 500
         except Exception as e:
-            return jsonify({'error': f'Verification failed: {str(e)}'}), 500
+            audit_logger.log_error('gpg', message='Unexpected verification error', user_id=user.id, error=str(e))
+            return jsonify({'error': 'An unexpected error occurred during verification.'}), 500
         return jsonify({'verified': verified}), 200
 
 # --- ENCRYPT ---
@@ -230,8 +247,13 @@ def encrypt(user, raw_api_key):
         enc_path = os.path.join(tmpdir, filename + '.gpg')
         try:
             encrypt_file(input_path, pubkey_data, enc_path)
+        except GPGOperationError as e:
+            audit_logger.log_error('gpg', message='Encryption failed', user_id=user.id, error=str(e))
+            # SECURITY: Generic error to client
+            return jsonify({'error': 'Encryption failed. Please verify the public key is valid.'}), 500
         except Exception as e:
-            return jsonify({'error': f'Encryption failed: {str(e)}'}), 500
+            audit_logger.log_error('gpg', message='Unexpected encryption error', user_id=user.id, error=str(e))
+            return jsonify({'error': 'An unexpected error occurred during encryption.'}), 500
         return send_file(enc_path, as_attachment=True)
 
 # --- DECRYPT ---
@@ -260,8 +282,13 @@ def decrypt(user, raw_api_key):
             # Use secure passphrase derivation with user ID as salt and RAW API key
             gpg_passphrase = derive_gpg_passphrase(raw_api_key, user.id)
             decrypt_file(input_path, privkey.key_data, dec_path, gpg_passphrase)
+        except GPGOperationError as e:
+            audit_logger.log_error('gpg', message='Decryption failed', user_id=user.id, error=str(e))
+            # SECURITY: Generic error to client
+            return jsonify({'error': 'Decryption failed. The file may be corrupted or encrypted for a different key.'}), 500
         except Exception as e:
-            return jsonify({'error': f'Decryption failed: {str(e)}'}), 500
+            audit_logger.log_error('gpg', message='Unexpected decryption error', user_id=user.id, error=str(e))
+            return jsonify({'error': 'An unexpected error occurred during decryption.'}), 500
         return send_file(dec_path, as_attachment=True)
 
 # --- CHALLENGE ---
