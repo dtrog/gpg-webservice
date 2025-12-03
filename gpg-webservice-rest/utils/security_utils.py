@@ -147,6 +147,9 @@ def validate_password(password: str) -> Tuple[bool, Optional[str]]:
     """
     Validate password according to security requirements.
     
+    For agent passwords (SHA256 hashes), complexity checks are skipped as they
+    already have high entropy. Human passwords must meet complexity requirements.
+    
     Args:
         password: Password to validate
         
@@ -162,7 +165,12 @@ def validate_password(password: str) -> Tuple[bool, Optional[str]]:
     if len(password) > 128:
         return False, "Password must be no more than 128 characters long"
     
-    # Check for at least one lowercase, uppercase, digit, and special character
+    # If password is a 64-character hex string (SHA256 hash), skip complexity checks
+    # These have 256 bits of entropy and don't need character class requirements
+    if len(password) == 64 and re.match(r'^[a-f0-9]+$', password):
+        return True, None
+    
+    # For human-created passwords, check for at least one lowercase, uppercase, digit, and special character
     checks = [
         (re.search(r'[a-z]', password), "Password must contain at least one lowercase letter"),
         (re.search(r'[A-Z]', password), "Password must contain at least one uppercase letter"), 
